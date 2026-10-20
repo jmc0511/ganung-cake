@@ -36,11 +36,14 @@ const server = http.createServer(async (req, res) => {
 
 app.whenReady().then(() => server.listen(0, async () => {
   const port = server.address().port;
-  const win = new BrowserWindow({ width: 1400, height: 1500, show: false });
+  const narrow = process.argv[4] === "narrow";
+  const win = new BrowserWindow({ width: narrow ? 600 : 1400, height: 1500, show: false });
   win.webContents.on('console-message', (e) => { if (/SMOKE|rror/.test(e.message)) console.log(e.message); });
   const real = process.argv[3] === "real";
   await win.loadURL(real ? `http://localhost:${port}/?smoke=search&q=${encodeURIComponent("펭수")}` : `http://localhost:${port}/?smoke=search&worker=${encodeURIComponent(`http://localhost:${port}/mock`)}`);
   await new Promise((r) => setTimeout(r, 11000));
+  await win.webContents.executeJavaScript(`document.querySelector(".add").scrollIntoView()`);
+  await new Promise((r) => setTimeout(r, 800));
   fs.writeFileSync(path.join(out, 'search.png'), (await win.webContents.capturePage()).toPNG());
   app.quit();
 }));
