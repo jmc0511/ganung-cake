@@ -63,7 +63,7 @@ const coarse = matchMedia('(pointer: coarse)');
 const syncTouch = () => document.documentElement.classList.toggle('touch', coarse.matches);
 syncTouch();
 coarse.addEventListener?.('change', syncTouch);
-const serial = ({ born, ...s }) => s;
+const serial = ({ born, pending, ...s }) => s;
 
 let toastTimer;
 function toast(msg, err = false) {
@@ -372,7 +372,7 @@ function drawNameTag(c, s, base, top) {
 
 function drawSticker(c, s, now) {
   const img = imgCache.get(s.id);
-  if (!img) return;
+  if (!img || s.pending) return;
   const g = geom(s, now);
   const { base, top, center, w, h } = g;
   if (g.landed) {
@@ -538,10 +538,124 @@ async function putSticker(s, animate) {
   if (state.stickers.some((o) => o.id === s.id)) return;
   imgCache.set(s.id, await loadImg(s.src));
   if (state.stickers.some((o) => o.id === s.id)) return;
-  s.born = animate ? performance.now() : 0;
+  s.born = 0;
+  s.pending = !!animate;
   state.stickers.push(s);
   refresh();
+  if (animate) await revealSticker(s);
 }
+
+// ---------- 공개 연출: 꽂기 전에 모두에게 크게 보여주기 ----------
+const REVEAL_MS = SMOKE && SMOKE !== 'reveal' ? 300 : 3200;
+const revealQueue = [];
+let revealing = null;
+function revealSticker(s) {
+  return new Promise((done) => {
+    revealQueue.push({ s, done });
+    if (!revealing) nextReveal();
+    else showQueueCount();
+  });
+}
+function showQueueCount() {
+  $('revealQueue').hidden = !revealQueue.length;
+  $('revealQueue').textContent = `다음 차례 ${revealQueue.length}개`;
+}
+function nextReveal() {
+  const item = revealQueue.shift();
+  if (!item) { revealing = null; $('reveal').hidden = true; return; }
+  const { s } = item;
+  // 연출 도중 지워진 토퍼는 건너뛴다
+  if (!state.stickers.includes(s)) { item.done(); return nextReveal(); }
+  revealing = item;
+  const who = (s.who || '').trim();
+  $('revealImg').src = s.src;
+  $('revealWho').textContent = who ? `${who}의 가능!` : '새 토퍼 등장!';
+  $('revealWho').style.background = who ? colorFor(who) : 'var(--berry)';
+  $('revealKicker').textContent = ['두구두구…', '이건 좀…', '과연…', '실화냐…'][Math.floor(Math.random() * 4)];
+  $('revealHint').textContent = '누르면 바로 꽂혀요';
+  showQueueCount();
+  const card = $('revealCard');
+  card.classList.remove('pop');
+  void card.offsetWidth;
+  card.classList.add('pop');
+  const bar = $('revealBar');
+  bar.style.transition = 'none';
+  bar.style.width = '0%';
+  void bar.offsetWidth;
+  bar.style.transition = `width ${REVEAL_MS}ms linear`;
+  bar.style.width = '100%';
+  $('reveal').hidden = false;
+  clearTimeout(item.timer);
+  item.timer = setTimeout(finishReveal, REVEAL_MS);
+}
+function finishReveal() {
+  const item = revealing;
+  if (!item) return;
+  clearTimeout(item.timer);
+  const { s } = item;
+  // '자세히 보기'로 연 이미 꽂힌 토퍼는 다시 떨어뜨리지 않는다
+  if (s.pending) { s.pending = false; s.born = performance.now(); }
+  dirty = true;
+  item.done();
+  nextReveal();
+}
+$('reveal').addEventListener('click', finishReveal);
+window.addEventListener('keydown', (e) => {
+  if (revealing && (e.key === 'Escape' || e.key === 'Enter' || e.key === ' ')) { e.preventDefault(); finishReveal(); }
+});
+
+// ---------- 토퍼 전체 보기 ----------
+function openGallery() {
+  const grid = $('galleryGrid');
+  grid.replaceChildren();
+  const list = state.stickers.filter((s) => !s.pending);
+  $('galleryCount').textContent = `${list.length}개`;
+  if (!list.length) {
+    const p = document.createElement('p');
+    p.className = 'gallery-empty';
+    p.textContent = '아직 꽂힌 토퍼가 없어요.';
+    grid.append(p);
+  }
+  for (const s of list) {
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.className = 'gallery-item';
+    const img = document.createElement('img');
+    img.src = s.src;
+    img.alt = s.who ? `${s.who}의 가능` : '토퍼';
+    const tag = document.createElement('span');
+    tag.className = 'gallery-who';
+    tag.textContent = s.who || '이름 없음';
+    tag.style.background = s.who ? colorFor(s.who) : 'var(--muted)';
+    b.append(img, tag);
+    b.addEventListener('click', () => { closeGallery(); select(s); showOnly(s); });
+    grid.append(b);
+  }
+  $('gallery').hidden = false;
+}
+function closeGallery() { $('gallery').hidden = true; }
+// 이미 꽂힌 토퍼를 크게 다시 보기 (연출과 같은 화면, 케이크에는 영향 없음)
+function showOnly(s) {
+  if (revealing) return;
+  revealing = { s, done() {}, timer: 0 };
+  $('revealImg').src = s.src;
+  $('revealWho').textContent = s.who ? `${s.who}의 가능` : '토퍼';
+  $('revealWho').style.background = s.who ? colorFor(s.who) : 'var(--muted)';
+  $('revealKicker').textContent = '자세히 보기';
+  $('revealHint').textContent = '누르면 닫혀요';
+  $('revealBar').style.transition = 'none';
+  $('revealBar').style.width = '0%';
+  $('revealQueue').hidden = true;
+  const card = $('revealCard');
+  card.classList.remove('pop');
+  void card.offsetWidth;
+  card.classList.add('pop');
+  $('reveal').hidden = false;
+}
+$('galleryBtn').addEventListener('click', openGallery);
+$('galleryClose').addEventListener('click', closeGallery);
+$('gallery').addEventListener('click', (e) => { if (e.target === $('gallery')) closeGallery(); });
+window.addEventListener('keydown', (e) => { if (e.key === 'Escape' && !$('gallery').hidden) closeGallery(); });
 
 function addSticker(norm, who = state.who) {
   const b = pickBase();
@@ -563,7 +677,7 @@ function addSticker(norm, who = state.who) {
     Net.send({ t: 'event', name: Net.name });
     addChat(null, '내가 토퍼를 꽂았어요');
   }
-  putSticker({ ...s }, true).then(() => select(state.stickers.find((o) => o.id === s.id)));
+  putSticker({ ...s }, true).then(() => { const t = state.stickers.find((o) => o.id === s.id); if (t) select(t); });
   return s;
 }
 
@@ -649,6 +763,7 @@ function toLogical(e) {
 function hitTest(p, extra = 0) {
   const now = performance.now();
   for (const s of [...state.stickers].sort((a, b) => b.by - a.by)) {
+    if (s.pending) continue;
     const { center, w, h, base, top } = geom(s, now);
     const dx = p.x - center.x, dy = p.y - center.y;
     const cos = Math.cos(-s.rot), sin = Math.sin(-s.rot);
@@ -712,6 +827,18 @@ const endPointer = (e) => {
 };
 canvas.addEventListener('pointerup', endPointer);
 canvas.addEventListener('pointercancel', endPointer);
+canvas.addEventListener('dblclick', (e) => {
+  const s = hitTest(toLogical(e), 8);
+  if (s) showOnly(s);
+});
+let lastTap = { t: 0, id: null };
+canvas.addEventListener('pointerup', (e) => {
+  if (e.pointerType !== 'touch') return;
+  const s = hitTest(toLogical(e), TOUCH_PAD);
+  const now = performance.now();
+  if (s && lastTap.id === s.id && now - lastTap.t < 350) { showOnly(s); lastTap = { t: 0, id: null }; }
+  else lastTap = { t: now, id: s?.id || null };
+});
 canvas.addEventListener('wheel', (e) => {
   const s = hitTest(toLogical(e)) || selected;
   if (!s) return;
@@ -1334,6 +1461,10 @@ async function runSmoke() {
     $('chatInput').value = '친구네 아빠는 진짜 선 넘었다';
     $('chatForm').requestSubmit();
   }
+  if (SMOKE === 'reveal') {
+    await demo([['고든 램지', '#E0B07A', '민지'], ['펭수', '#7FC8E8', '도윤'], ['그 악역', '#B07AC9', '서연']]);
+    return;
+  }
   if (SMOKE === 'search') {
     state.who = '하준';
     $('q').value = params.get('q') || '주사위';
@@ -1360,7 +1491,7 @@ async function runSmoke() {
     };
     return;
   }
-  setTimeout(() => console.log('SMOKE', SMOKE, 'role', Net.role, 'stickers', state.stickers.length, state.stickers.map((s) => `${s.who}:${s.shape}:${Math.round(s.size)}`).join(',')), 6000);
+  setTimeout(() => console.log('SMOKE', SMOKE, 'role', Net.role, 'stickers', state.stickers.length, state.stickers.map((s) => `${s.who}:${s.shape}:${Math.round(s.size)}`).join(','), 'pending', state.stickers.filter((s) => s.pending).length), 6000);
 }
 
 (async () => {

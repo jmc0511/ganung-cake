@@ -11,7 +11,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Jua&family=Gowun+Dodum&display=swap">
-<link rel="stylesheet" href="style.css?v=202610210009">
+<link rel="stylesheet" href="style.css?v=202610210017">
 </head>
 <body>
 <div class="app">
@@ -152,6 +152,7 @@
       <label class="check"><input id="showNames" type="checkbox" checked> 이름표</label>
       <span class="count" id="count">0개</span>
       <span class="act-btns">
+        <button type="button" class="btn ghost sm" id="galleryBtn">전체 보기</button>
         <button type="button" class="btn ghost sm" id="clearAll">다 비우기</button>
         <button type="button" class="btn ghost sm" id="copy">이미지 복사</button>
         <button type="button" class="btn ghost sm" id="share" hidden>공유</button>
@@ -192,11 +193,33 @@
   </div>
 </div>
 
+<div class="reveal" id="reveal" hidden role="dialog" aria-modal="true" aria-labelledby="revealWho">
+  <div class="reveal-card" id="revealCard">
+    <p class="reveal-kicker" id="revealKicker">두구두구…</p>
+    <div class="reveal-frame"><img id="revealImg" alt=""></div>
+    <p class="reveal-who" id="revealWho"></p>
+    <div class="reveal-bar" aria-hidden="true"><span id="revealBar"></span></div>
+    <p class="reveal-hint" id="revealHint">누르면 바로 꽂혀요</p>
+  </div>
+  <p class="reveal-queue" id="revealQueue" hidden></p>
+</div>
+
+<div class="gallery" id="gallery" hidden role="dialog" aria-modal="true" aria-labelledby="galleryTitle">
+  <div class="gallery-card">
+    <header class="gallery-head">
+      <h2 class="tag" id="galleryTitle">토퍼 전체 보기</h2>
+      <span class="gallery-count" id="galleryCount"></span>
+      <button type="button" class="btn ghost sm" id="galleryClose">닫기</button>
+    </header>
+    <div class="gallery-grid" id="galleryGrid"></div>
+  </div>
+</div>
+
 <div class="toast" id="toast" role="status" aria-live="polite"></div>
 
 <script src="https://cdn.jsdelivr.net/npm/peerjs@1.5.4/dist/peerjs.min.js"></script>
-<script src="net.js?v=202610210009"></script>
-<script src="grab.js?v=202610210009"></script>
-<script src="app.js?v=202610210009"></script>
+<script src="net.js?v=202610210017"></script>
+<script src="grab.js?v=202610210017"></script>
+<script src="app.js?v=202610210017"></script>
 </body>
 </html>
