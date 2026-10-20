@@ -524,3 +524,54 @@ button, .btn, .seg button, summary, .filepick { touch-action: manipulation; -web
   .app { grid-template-columns: minmax(0, 1fr) 340px; gap: 16px 20px; }
   .fields { grid-template-columns: 1fr; }
 }
+
+/* ---------- 바로 검색 결과 ---------- */
+.add.inmode .ext { display: none !important; }
+.results-wrap { display: flex; flex-direction: column; gap: 8px; }
+.results-status { margin: 0; font-size: 13.5px; color: var(--muted); }
+.results {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+  max-height: 420px;
+  overflow-y: auto;
+  padding: 4px 6px 8px 2px;
+  overscroll-behavior: contain;
+}
+.results:empty { display: none; }
+.tile {
+  position: relative;
+  aspect-ratio: 1;
+  padding: 0;
+  border: 2px solid var(--ink);
+  border-radius: 12px;
+  background: var(--cream);
+  overflow: hidden;
+  cursor: pointer;
+  box-shadow: 2px 2px 0 var(--ink);
+  transition: transform 0.08s, box-shadow 0.08s;
+  touch-action: manipulation;
+}
+.tile img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.tile:active { transform: translate(2px, 2px); box-shadow: 0 0 0 var(--ink); }
+@media (hover: hover) {
+  .tile:hover { transform: translate(-1px, -1px) rotate(-1.5deg); box-shadow: 3px 3px 0 var(--ink); }
+}
+.tile.busy::after, .tile.used::after {
+  position: absolute;
+  inset: auto 6px 6px auto;
+  font: 400 12px/1 var(--display);
+  padding: 4px 7px 3px;
+  border-radius: 999px;
+  border: 1.5px solid var(--ink);
+}
+.tile.busy::after { content: "꽂는 중"; background: var(--butter); }
+.tile.used::after { content: "꽂음"; background: var(--mint); }
+.tile.busy img { opacity: 0.6; }
+.more { align-self: center; }
+@media (min-width: 901px) and (max-width: 1180px) {
+  .results { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .tile { transition: none; }
+}

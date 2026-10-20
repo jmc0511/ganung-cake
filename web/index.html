@@ -114,16 +114,22 @@
         <button type="button" class="btn ghost sm" id="reuseNew">창을 닫았어요, 새로 열기</button>
       </div>
       <div class="seg engines" id="engines" role="group" aria-label="검색 엔진">
+        <button type="button" data-engine="in" id="engineIn" hidden>바로 검색</button>
         <button type="button" data-engine="google" class="on">구글</button>
         <button type="button" data-engine="naver">네이버</button>
         <button type="button" data-engine="pinterest">핀터레스트</button>
         <button type="button" data-engine="namu">나무위키</button>
       </div>
-      <ol class="how only-mouse">
+      <div class="results-wrap" id="resultsWrap" hidden>
+        <p class="results-status" id="resultsStatus" aria-live="polite"></p>
+        <div class="results" id="results"></div>
+        <button type="button" class="btn ghost sm more" id="more" hidden>더 보기</button>
+      </div>
+      <ol class="how ext only-mouse">
         <li>검색하면 옆에 검색 창이 열려요.</li>
         <li>마음에 드는 이미지를 케이크로 <b>끌어다 놓거나</b>, 우클릭 &gt; <b>이미지 복사</b> 후 여기서 <b>Ctrl+V</b>.</li>
       </ol>
-      <ol class="how only-touch">
+      <ol class="how ext only-touch">
         <li>검색하면 새 탭으로 열려요.</li>
         <li>이미지를 <b>길게 눌러 복사</b>하고 이 탭으로 돌아와요.</li>
         <li>아래 <b>복사한 이미지 붙여넣기</b>를 누르면 꽂혀요.</li>
@@ -139,7 +145,7 @@
         <span>내 기기에서 고르기</span>
       </label>
       </div>
-      <details class="bm only-mouse">
+      <details class="bm ext only-mouse">
         <summary>검색 창에 <b>케이크에 꽂기</b> 버튼 띄우기</summary>
         <p>아래 버튼을 북마크바로 끌어다 두세요. 검색 창에서 그 북마크를 한 번 누르면, 이미지에 마우스를 올릴 때 <b>케이크에 꽂기</b> 버튼이 떠요.</p>
         <a class="bmlink" id="bmlink" href="#">케이크에 꽂기</a>

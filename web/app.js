@@ -5,6 +5,9 @@ const PLATE = { cy: CAKE.topY + CAKE.bodyH + 24, rx: 425, ry: 142 };
 const BORDER = 8;
 const TAG_COLORS = ['#D93A64', '#2F7FC1', '#2F8F5B', '#C9771C', '#7A4FC4', '#C23B9A', '#1E8C8C', '#8A5A2B'];
 const PROXY = (u) => `https://wsrv.nl/?url=${encodeURIComponent(u)}&w=640&h=640&fit=inside&we&output=webp`;
+// 중계 서버(Cloudflare Worker, worker/). 비어 있으면 '바로 검색'을 숨기고 wsrv.nl만 쓴다.
+const WORKER_DEFAULT = 'https://ganung-cake.jmc0511.workers.dev';
+const viaWorker = (u) => `${WORKER_URL}/img?url=${encodeURIComponent(u)}`;
 
 const ENGINES = {
   google: (q) => `https://www.google.com/search?tbm=isch&hl=ko&q=${encodeURIComponent(q)}`,
@@ -18,6 +21,7 @@ const canvas = $('cake');
 const ctx = canvas.getContext('2d');
 const params = new URLSearchParams(location.search);
 const SMOKE = params.get('smoke');
+const WORKER_URL = (SMOKE && params.get('worker')) || WORKER_DEFAULT;
 
 const state = { title: '', who: '', showNames: true, engine: 'google', stickers: [] };
 let selected = null;
@@ -103,7 +107,7 @@ function save() {
   if (SMOKE || Net.role === 'guest') return;
   clearTimeout(saveTimer);
   saveTimer = setTimeout(() => {
-    store.set('cake', { title: state.title, showNames: state.showNames, engine: state.engine, stickers: state.stickers.map(serial) });
+    store.set('cake', { title: state.title, showNames: state.showNames, engine: state.engine, engineChosen: true, stickers: state.stickers.map(serial) });
   }, 500);
 }
 function savePrefs() { if (!SMOKE) store.set('who', state.who); }
@@ -487,6 +491,7 @@ async function fromUrl(url) {
   url = url.trim();
   if (/^data:image\//.test(url)) return normalize(await loadImg(url));
   if (!/^https?:\/\//i.test(url)) throw new Error('not url');
+  if (WORKER_URL) { try { return await normalize(await loadImg(viaWorker(url), true)); } catch { /* 다음 방법 */ } }
   try { return await normalize(await loadImg(PROXY(url), true)); } catch { /* 프록시 실패 시 직접 */ }
   return normalize(await loadImg(url, true));
 }
@@ -783,9 +788,69 @@ $('who').addEventListener('input', (e) => { state.who = e.target.value; savePref
 $('showNames').addEventListener('change', (e) => { state.showNames = e.target.checked; dirty = true; save(); });
 
 function setEngine(name) {
+  if (name === 'in' && !WORKER_URL) name = 'google';
   state.engine = name;
   for (const b of $('engines').children) b.classList.toggle('on', b.dataset.engine === name);
+  document.querySelector('.add').classList.toggle('inmode', name === 'in');
+  $('resultsWrap').hidden = name !== 'in' || !$('results').children.length;
 }
+
+// ---------- 바로 검색 (카카오·네이버 이미지, 중계 서버 경유) ----------
+const found = { q: '', next: null, busy: false };
+async function searchIn(q, more = false) {
+  if (found.busy) return;
+  if (!more) { found.q = q; found.next = 1; $('results').replaceChildren(); }
+  if (!found.next) return;
+  found.busy = true;
+  $('resultsWrap').hidden = false;
+  $('more').hidden = true;
+  $('resultsStatus').textContent = more ? '더 불러오는 중…' : `"${q}" 찾는 중…`;
+  try {
+    const res = await fetch(`${WORKER_URL}/search?q=${encodeURIComponent(found.q)}&start=${found.next}`);
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.error || '검색하지 못했어요');
+    for (const it of data.items) $('results').append(resultTile(it));
+    found.next = data.next;
+    $('resultsStatus').textContent = data.items.length || more
+      ? '누르면 바로 케이크에 꽂혀요'
+      : `"${found.q}" 결과가 없어요. 다른 말로 찾아보세요.`;
+    $('more').hidden = !found.next;
+  } catch (e) {
+    $('resultsStatus').textContent = `${e.message}. 잠시 뒤 다시 해보세요.`;
+    $('more').hidden = !found.next;
+  } finally {
+    found.busy = false;
+  }
+}
+
+function resultTile(it) {
+  const b = document.createElement('button');
+  b.type = 'button';
+  b.className = 'tile';
+  b.title = it.title || '';
+  b.setAttribute('aria-label', `${it.title || '이미지'} 꽂기`);
+  const img = document.createElement('img');
+  img.loading = 'lazy';
+  img.decoding = 'async';
+  img.referrerPolicy = 'no-referrer';
+  img.alt = '';
+  img.src = it.thumb;
+  img.onerror = () => { img.onerror = null; img.src = viaWorker(it.thumb); };
+  b.append(img);
+  b.addEventListener('click', async () => {
+    if (b.classList.contains('busy')) return;
+    b.classList.add('busy');
+    // 원본이 크고 선명하지만 막혀 있는 경우가 많아서, 실패하면 네이버 썸네일로 꽂는다
+    await ingest(async () => {
+      try { return await normalize(await loadImg(viaWorker(it.link), true)); }
+      catch { return normalize(await loadImg(viaWorker(it.thumb), true)); }
+    });
+    b.classList.remove('busy');
+    b.classList.add('used');
+  });
+  return b;
+}
+$('more').addEventListener('click', () => searchIn(found.q, true));
 // 구글은 COOP 헤더 때문에 한 번 연 창을 이름으로 다시 찾을 수 없다(검색할 때마다 새 창이 생김).
 // 그래서 구글 창을 이미 열었으면 새로 열지 않고 검색어만 복사해 그 창에서 붙여넣게 한다.
 let googleOpened = false;
@@ -814,13 +879,13 @@ $('engines').addEventListener('click', (e) => {
   $('reuse').hidden = true;
   save();
   const q = $('q').value.trim();
-  if (q) openSearch(q);
+  if (q) state.engine === 'in' ? searchIn(q) : openSearch(q);
 });
 $('searchForm').addEventListener('submit', (e) => {
   e.preventDefault();
   const q = $('q').value.trim();
   if (!q) return $('q').focus();
-  openSearch(q);
+  if (state.engine === 'in') { $('q').blur(); searchIn(q); } else openSearch(q);
 });
 $('urlForm').addEventListener('submit', (e) => {
   e.preventDefault();
@@ -1184,6 +1249,19 @@ async function runSmoke() {
     $('chatInput').value = '친구네 아빠는 진짜 선 넘었다';
     $('chatForm').requestSubmit();
   }
+  if (SMOKE === 'search') {
+    state.who = '하준';
+    $('q').value = params.get('q') || '주사위';
+    $('searchForm').requestSubmit();
+    await sleep(2500);
+    const tiles = [...document.querySelectorAll('.tile')];
+    tiles[0]?.click();
+    await sleep(300);
+    tiles[1]?.click();
+    await sleep(4000);
+    console.log('SMOKE search engine', state.engine, 'tiles', tiles.length, 'status', $('resultsStatus').textContent, 'stickers', state.stickers.length, 'used', document.querySelectorAll('.tile.used').length);
+    return;
+  }
   if (SMOKE === 'mobile') {
     state.who = '서연';
     await demo([['고든 램지', '#E0B07A', '서연'], ['펭수', '#7FC8E8', '서연'], ['그 악역', '#B07AC9', '서연', 'circle']]);
@@ -1198,8 +1276,10 @@ async function runSmoke() {
 
 (async () => {
   try { await document.fonts.ready; } catch { /* 글꼴 없이 진행 */ }
+  let engineChosen = false;
   if (!SMOKE) {
     const saved = await store.get('cake');
+    engineChosen = !!saved?.engineChosen;
     state.who = (await store.get('who')) || '';
     if (saved) {
       Object.assign(state, { title: saved.title || '', showNames: saved.showNames !== false, engine: saved.engine || 'google' });
@@ -1211,6 +1291,10 @@ async function runSmoke() {
   $('title').value = state.title;
   $('who').value = state.who;
   $('showNames').checked = state.showNames;
+  if (WORKER_URL) {
+    $('engineIn').hidden = false;
+    if (!engineChosen) state.engine = 'in';
+  }
   setEngine(state.engine);
   select(null);
   refresh();

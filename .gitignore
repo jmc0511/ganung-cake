@@ -1,2 +1,5 @@
 node_modules/
 dist/
+worker/secrets.json
+worker/.dev.vars
+worker/.wrangler/
