@@ -1,0 +1,25 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<title>케이크에 꽂는 중</title>
+<style>
+  :root { color-scheme: light; }
+  body { margin: 0; height: 100vh; display: grid; place-items: center; background: #FFF4F1; color: #3A1E29; font: 15px "Malgun Gothic", sans-serif; }
+</style>
+</head>
+<body>
+<p id="msg">케이크에 꽂는 중…</p>
+<script>
+  // 북마클릿이 넘긴 이미지 주소를 같은 사이트의 케이크 탭으로 전달하고 닫힌다
+  const url = decodeURIComponent(location.hash.slice(1));
+  const ch = new BroadcastChannel('ganung-cake');
+  let acked = false;
+  ch.onmessage = (e) => { if (e.data?.type === 'ack') { acked = true; window.close(); } };
+  if (url) ch.postMessage({ type: 'grab', url });
+  setTimeout(() => {
+    if (!acked) document.getElementById('msg').textContent = '케이크 탭을 못 찾았어요. 케이크 사이트를 열어둔 채로 다시 눌러주세요.';
+  }, 1500);
+</script>
+</body>
+</html>

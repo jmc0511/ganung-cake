@@ -1,0 +1,145 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>가능충 케이크</title>
+<meta name="description" content="각자의 '이건 가능'을 막대에 꽂아 한 케이크에. 친구들과 링크 하나로 같이 꽂는 Hear me out 케이크 메이커.">
+<meta property="og:title" content="가능충 케이크">
+<meta property="og:description" content="링크 열고 같이 꽂자. 각자의 가능을 한 케이크에.">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Cellipse cx='16' cy='24' rx='13' ry='5' fill='%23F4B4C5'/%3E%3Crect x='3' y='15' width='26' height='9' fill='%23F4B4C5'/%3E%3Cellipse cx='16' cy='15' rx='13' ry='5' fill='%23fff' stroke='%23D93A64' stroke-width='2'/%3E%3Crect x='15' y='3' width='2' height='12' fill='%23C4955C'/%3E%3Crect x='10' y='1' width='12' height='8' rx='1.5' fill='%23D93A64'/%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Jua&family=Gowun+Dodum&display=swap">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div class="app">
+  <header class="brand">
+    <h1>가능충 케이크</h1>
+    <p>각자의 "이건 가능"을 막대에 꽂아 한 케이크에.</p>
+  </header>
+
+  <main class="stage-col">
+    <div class="stage" id="stage">
+      <canvas id="cake" aria-label="케이크 미리보기"></canvas>
+      <div class="empty" id="empty">
+        <p>이미지를 여기로 <b>끌어다 놓거나</b><br><b>Ctrl+V</b>로 붙여넣으세요</p>
+      </div>
+      <div class="dropveil" id="dropveil" hidden><span>놓으면 꽂혀요</span></div>
+    </div>
+    <div class="sel" id="sel" hidden>
+      <div class="sel-row">
+        <label class="mini">크기 <input id="selSize" type="range" min="70" max="320" step="1"></label>
+        <label class="mini">막대 <input id="selLen" type="range" min="110" max="400" step="1"></label>
+      </div>
+      <div class="sel-row">
+        <div class="seg" id="selShape" role="group" aria-label="모양">
+          <button type="button" data-shape="card">사진</button>
+          <button type="button" data-shape="circle">동그라미</button>
+          <button type="button" data-shape="cutout">누끼</button>
+        </div>
+        <input id="selWho" class="selwho" type="text" maxlength="12" placeholder="이름표" aria-label="이름표">
+        <button type="button" class="btn ghost danger" id="selDel">뽑기</button>
+      </div>
+    </div>
+  </main>
+
+  <aside class="panel">
+    <section class="card">
+      <div class="fields">
+        <label class="field">
+          <span>내 이름</span>
+          <input id="who" type="text" maxlength="12" placeholder="이름표에 들어갈 이름">
+        </label>
+        <label class="field">
+          <span>케이크 이름</span>
+          <input id="title" type="text" maxlength="30" placeholder="우리들의 가능 케이크">
+        </label>
+      </div>
+    </section>
+
+    <section class="card room" id="room">
+      <h2>같이 꽂기</h2>
+      <div id="roomSolo" class="room-solo">
+        <button type="button" class="btn primary" id="roomCreate">방 만들기</button>
+        <div class="join">
+          <input id="roomCode" type="text" maxlength="5" placeholder="방 코드" aria-label="방 코드" autocomplete="off">
+          <button type="button" class="btn ghost" id="roomJoin">참가</button>
+        </div>
+      </div>
+      <div id="roomLive" class="room-live" hidden>
+        <div class="code-row">
+          <span class="live-dot" aria-hidden="true"></span>
+          <span class="code" id="roomCodeText">-----</span>
+          <button type="button" class="btn ghost sm" id="roomCopy">초대 링크 복사</button>
+          <button type="button" class="btn ghost sm" id="roomLeave">나가기</button>
+        </div>
+        <ul class="peers" id="peers"></ul>
+      </div>
+      <p class="note" id="roomNote">방을 만들고 초대 링크를 보내면, 친구가 꽂는 이미지가 모두의 케이크에 바로 꽂혀요.</p>
+    </section>
+
+    <section class="card add">
+      <h2>이미지 찾기</h2>
+      <form class="search" id="searchForm">
+        <input id="q" type="search" placeholder="고든 램지, 그 캐릭터…" autocomplete="off" aria-label="검색어">
+        <button type="submit" class="btn primary">검색</button>
+      </form>
+      <div class="seg engines" id="engines" role="group" aria-label="검색 엔진">
+        <button type="button" data-engine="google" class="on">구글</button>
+        <button type="button" data-engine="naver">네이버</button>
+        <button type="button" data-engine="pinterest">핀터레스트</button>
+        <button type="button" data-engine="namu">나무위키</button>
+      </div>
+      <ol class="how">
+        <li>검색하면 옆에 검색 창이 열려요.</li>
+        <li>마음에 드는 이미지를 케이크로 <b>끌어다 놓거나</b>, 우클릭 &gt; <b>이미지 복사</b> 후 여기서 <b>Ctrl+V</b>.</li>
+      </ol>
+      <form class="urlform" id="urlForm">
+        <input id="url" type="text" placeholder="이미지 주소를 붙여넣어도 돼요" aria-label="이미지 주소" autocomplete="off">
+        <button type="submit" class="btn ghost">꽂기</button>
+      </form>
+      <label class="filepick">
+        <input id="file" type="file" accept="image/*" multiple>
+        <span>내 기기에서 고르기</span>
+      </label>
+      <details class="bm">
+        <summary>검색 창에 <b>케이크에 꽂기</b> 버튼 띄우기</summary>
+        <p>아래 버튼을 북마크바로 끌어다 두세요. 검색 창에서 그 북마크를 한 번 누르면, 이미지에 마우스를 올릴 때 <b>케이크에 꽂기</b> 버튼이 떠요. 이 사이트의 검색 버튼으로 연 창에서만 동작해요.</p>
+        <a class="bmlink" id="bmlink" href="#">케이크에 꽂기</a>
+      </details>
+    </section>
+
+    <footer class="actions">
+      <label class="check"><input id="showNames" type="checkbox" checked> 이름표</label>
+      <span class="count" id="count">0개</span>
+      <span class="act-btns">
+        <button type="button" class="btn ghost" id="clearAll">다 비우기</button>
+        <button type="button" class="btn ghost" id="copy">이미지 복사</button>
+      </span>
+      <button type="button" class="btn primary" id="save">PNG 저장</button>
+    </footer>
+  </aside>
+</div>
+
+<div class="modal" id="nameModal" hidden>
+  <form class="modal-card" id="nameForm">
+    <h2>케이크에 같이 꽂기</h2>
+    <p id="nameModalText">친구가 케이크 방에 초대했어요. 이름표에 들어갈 이름을 정해주세요.</p>
+    <input id="nameInput" type="text" maxlength="12" placeholder="내 이름" aria-label="내 이름" required>
+    <div class="modal-actions">
+      <button type="button" class="btn ghost" id="nameCancel">혼자 하기</button>
+      <button type="submit" class="btn primary">들어가기</button>
+    </div>
+  </form>
+</div>
+
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+<script src="https://cdn.jsdelivr.net/npm/peerjs@1.5.4/dist/peerjs.min.js"></script>
+<script src="net.js"></script>
+<script src="grab.js"></script>
+<script src="app.js"></script>
+</body>
+</html>

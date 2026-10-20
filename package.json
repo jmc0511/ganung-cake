@@ -1,0 +1,17 @@
+{
+  "name": "ganung-cake",
+  "version": "1.0.0",
+  "private": true,
+  "description": "가능충 케이크 메이커",
+  "main": "main.js",
+  "scripts": {
+    "start": "electron ."
+  },
+  "devDependencies": {
+    "electron": "^37.10.3",
+    "electron-builder": "^25.1.8"
+  },
+  "dependencies": {
+    "peerjs": "^1.5.4"
+  }
+}
