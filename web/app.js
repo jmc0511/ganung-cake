@@ -741,17 +741,32 @@ function setEngine(name) {
   state.engine = name;
   for (const b of $('engines').children) b.classList.toggle('on', b.dataset.engine === name);
 }
-function openSearch(q) {
+// 구글은 COOP 헤더 때문에 한 번 연 창을 이름으로 다시 찾을 수 없다(검색할 때마다 새 창이 생김).
+// 그래서 구글 창을 이미 열었으면 새로 열지 않고 검색어만 복사해 그 창에서 붙여넣게 한다.
+let googleOpened = false;
+let lastQuery = '';
+function openSearch(q, forceNew = false) {
+  lastQuery = q;
+  if (state.engine === 'google' && googleOpened && !forceNew) {
+    navigator.clipboard?.writeText(q).catch(() => {});
+    $('reuse').hidden = false;
+    return;
+  }
+  $('reuse').hidden = true;
   const w = Math.min(820, Math.round(screen.availWidth * 0.45));
   const h = Math.round(screen.availHeight * 0.9);
   const left = Math.max(0, window.screenX + window.outerWidth - w);
   const win = window.open(ENGINES[state.engine](q), 'ganung-search', `popup,width=${w},height=${h},left=${left},top=${Math.max(0, window.screenY + 40)}`);
-  if (!win) toast('팝업이 막혔어요. 주소창 오른쪽에서 팝업을 허용해 주세요.', true);
+  if (!win) return toast('팝업이 막혔어요. 주소창 오른쪽에서 팝업을 허용해 주세요.', true);
+  try { win.focus(); } catch { /* 다른 출처 */ }
+  if (state.engine === 'google') googleOpened = true;
 }
+$('reuseNew').addEventListener('click', () => openSearch(lastQuery || $('q').value.trim(), true));
 $('engines').addEventListener('click', (e) => {
   const b = e.target.closest('button');
   if (!b) return;
   setEngine(b.dataset.engine);
+  $('reuse').hidden = true;
   save();
   const q = $('q').value.trim();
   if (q) openSearch(q);
@@ -816,10 +831,17 @@ $('clearAll').addEventListener('click', (e) => {
 // 북마클릿 + 중계 채널
 $('bmlink').href = 'javascript:' + encodeURIComponent('(' + ganungCakeBookmarklet.toString().replace('__RELAY__', new URL('relay.html', location.href).href) + ')()');
 $('bmlink').addEventListener('click', (e) => { e.preventDefault(); toast('이 버튼은 누르지 말고 북마크바로 끌어다 두세요.'); });
+// 케이크 탭이 여러 개면 마지막으로 만진 탭 하나만 받는다
+const TAB_ID = Math.random().toString(36).slice(2);
+const claimTab = () => { try { localStorage.setItem('ganung-active-tab', TAB_ID); } catch { /* 저장 불가 */ } };
+const isActiveTab = () => { try { const v = localStorage.getItem('ganung-active-tab'); return !v || v === TAB_ID; } catch { return true; } };
+claimTab();
+window.addEventListener('focus', claimTab);
+document.addEventListener('pointerdown', claimTab, true);
 try {
   const ch = new BroadcastChannel('ganung-cake');
   ch.onmessage = (e) => {
-    if (e.data?.type !== 'grab' || typeof e.data.url !== 'string') return;
+    if (e.data?.type !== 'grab' || typeof e.data.url !== 'string' || !isActiveTab()) return;
     ch.postMessage({ type: 'ack' });
     ingest(() => fromUrl(e.data.url));
   };

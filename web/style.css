@@ -381,6 +381,19 @@ input[type="range"] { flex: 1; min-width: 0; accent-color: var(--berry); }
   transform: rotate(-2deg);
 }
 
+.reuse {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 10px 12px;
+  background: var(--butter);
+  border: 2px solid var(--ink);
+  border-radius: 14px;
+}
+.reuse p { margin: 0; font-size: 14px; }
+.reuse b { color: var(--berry-deep); font-weight: 400; font-family: var(--display); }
+
 /* ---------- 하단 ---------- */
 .actions { display: grid; grid-template-columns: auto 1fr auto; align-items: center; gap: 10px; }
 .act-btns { display: flex; gap: 8px; }
