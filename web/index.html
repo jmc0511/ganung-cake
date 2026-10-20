@@ -11,7 +11,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Jua&family=Gowun+Dodum&display=swap">
-<link rel="stylesheet" href="style.css">
+<link rel="stylesheet" href="style.css?v=202610210009">
 </head>
 <body>
 <div class="app">
@@ -120,11 +120,7 @@
         <button type="button" data-engine="pinterest">핀터레스트</button>
         <button type="button" data-engine="namu">나무위키</button>
       </div>
-      <div class="results-wrap" id="resultsWrap" hidden>
-        <p class="results-status" id="resultsStatus" aria-live="polite"></p>
-        <div class="results" id="results"></div>
-        <button type="button" class="btn ghost sm more" id="more" hidden>더 보기</button>
-      </div>
+      <button type="button" class="btn ghost reopen" id="reopen" hidden></button>
       <ol class="how ext only-mouse">
         <li>검색하면 옆에 검색 창이 열려요.</li>
         <li>마음에 드는 이미지를 케이크로 <b>끌어다 놓거나</b>, 우클릭 &gt; <b>이미지 복사</b> 후 여기서 <b>Ctrl+V</b>.</li>
@@ -177,11 +173,30 @@
   </form>
 </div>
 
+<div class="picker" id="picker" hidden role="dialog" aria-modal="true" aria-labelledby="pickerTitle">
+  <div class="picker-card">
+    <header class="picker-head">
+      <h2 class="tag" id="pickerTitle">골라서 꽂기</h2>
+      <form class="search picker-search" id="pickerForm">
+        <input id="pq" type="search" placeholder="다른 걸 찾아볼까요" aria-label="검색어" autocomplete="off">
+        <button type="submit" class="btn primary">검색</button>
+      </form>
+      <button type="button" class="btn ghost sm picker-close" id="pickerClose">닫기</button>
+    </header>
+    <p class="results-status" id="resultsStatus" aria-live="polite"></p>
+    <div class="picker-body" id="pickerBody">
+      <div class="results" id="results"></div>
+      <div class="sentinel" id="sentinel" aria-hidden="true"></div>
+      <button type="button" class="btn ghost sm more" id="more" hidden>더 보기</button>
+    </div>
+  </div>
+</div>
+
 <div class="toast" id="toast" role="status" aria-live="polite"></div>
 
 <script src="https://cdn.jsdelivr.net/npm/peerjs@1.5.4/dist/peerjs.min.js"></script>
-<script src="net.js"></script>
-<script src="grab.js"></script>
-<script src="app.js"></script>
+<script src="net.js?v=202610210009"></script>
+<script src="grab.js?v=202610210009"></script>
+<script src="app.js?v=202610210009"></script>
 </body>
 </html>

@@ -723,7 +723,7 @@ canvas.addEventListener('wheel', (e) => {
 window.addEventListener('keydown', (e) => {
   if (e.target.matches('input, textarea')) return;
   if (selected && (e.key === 'Delete' || e.key === 'Backspace')) removeSticker(selected.id);
-  if (e.key === 'Escape') select(null);
+  if (e.key === 'Escape' && $('picker').hidden) select(null);
 });
 
 // 끌어다 놓기 (페이지 어디에 놓아도 됨)
@@ -792,35 +792,93 @@ function setEngine(name) {
   state.engine = name;
   for (const b of $('engines').children) b.classList.toggle('on', b.dataset.engine === name);
   document.querySelector('.add').classList.toggle('inmode', name === 'in');
-  $('resultsWrap').hidden = name !== 'in' || !$('results').children.length;
+  $('reopen').hidden = name !== 'in' || !found.q;
 }
 
 // ---------- 바로 검색 (카카오·네이버 이미지, 중계 서버 경유) ----------
-const found = { q: '', next: null, busy: false };
+// 결과는 큰 '골라서 꽂기' 창에 원래 비율 그대로 벽돌처럼 쌓아 보여준다.
+// PC는 오른쪽 창이라 왼쪽 케이크를 보면서 고르고, 폰은 전체 화면.
+const found = { q: '', next: null, busy: false, picked: 0 };
+const preview = (u) => `https://wsrv.nl/?url=${encodeURIComponent(u)}&w=600&h=1000&fit=inside&we&output=webp&q=82`;
+
+function openPicker() {
+  $('picker').hidden = false;
+  document.body.classList.add('picker-open');
+  $('pq').value = found.q;
+}
+function closePicker() {
+  $('picker').hidden = true;
+  document.body.classList.remove('picker-open');
+  setEngine(state.engine);
+  if (found.q) $('reopen').textContent = `"${found.q}" 결과 다시 보기`;
+}
+
 async function searchIn(q, more = false) {
   if (found.busy) return;
-  if (!more) { found.q = q; found.next = 1; $('results').replaceChildren(); }
+  openPicker();
+  if (!more) {
+    found.q = q;
+    found.next = 1;
+    found.picked = 0;
+    resetColumns();
+    $('pickerBody').scrollTop = 0;
+    $('q').value = q;
+    $('pq').value = q;
+  }
   if (!found.next) return;
   found.busy = true;
-  $('resultsWrap').hidden = false;
   $('more').hidden = true;
-  $('resultsStatus').textContent = more ? '더 불러오는 중…' : `"${q}" 찾는 중…`;
+  $('resultsStatus').textContent = more ? '더 불러오는 중…' : `"${found.q}" 찾는 중…`;
   try {
     const res = await fetch(`${WORKER_URL}/search?q=${encodeURIComponent(found.q)}&start=${found.next}`);
     const data = await res.json().catch(() => ({}));
     if (!res.ok) throw new Error(data.error || '검색하지 못했어요');
-    for (const it of data.items) $('results').append(resultTile(it));
+    for (const it of data.items) placeTile(resultTile(it), it);
     found.next = data.next;
-    $('resultsStatus').textContent = data.items.length || more
-      ? '누르면 바로 케이크에 꽂혀요'
-      : `"${found.q}" 결과가 없어요. 다른 말로 찾아보세요.`;
+    statusLine(data.items.length || more ? '' : `"${found.q}" 결과가 없어요. 다른 말로 찾아보세요.`);
     $('more').hidden = !found.next;
   } catch (e) {
-    $('resultsStatus').textContent = `${e.message}. 잠시 뒤 다시 해보세요.`;
+    statusLine(`${e.message}. 잠시 뒤 다시 해보세요.`);
     $('more').hidden = !found.next;
   } finally {
     found.busy = false;
+    // 결과가 화면을 다 못 채우면 감시를 다시 걸어 바로 다음 쪽을 불러오게 한다
+    moreWatch.unobserve($('sentinel'));
+    moreWatch.observe($('sentinel'));
   }
+}
+
+// 벽돌 쌓기: 원본 크기(w,h)로 높이를 미리 알 수 있으니 가장 짧은 줄에 하나씩 넣는다.
+// 그래서 순서가 왼쪽→오른쪽으로 읽히고, 더 불러와도 있던 칸이 움직이지 않는다.
+const masonry = { cols: [], heights: [], tiles: [] };
+function columnCount() {
+  const w = $('results').clientWidth || 600;
+  return Math.max(2, Math.min(5, Math.floor((w + 12) / 182)));
+}
+function resetColumns(n = columnCount(), keep = []) {
+  masonry.cols = Array.from({ length: n }, () => { const c = document.createElement('div'); c.className = 'col'; return c; });
+  masonry.heights = new Array(n).fill(0);
+  masonry.tiles = [];
+  $('results').replaceChildren(...masonry.cols);
+  for (const [el, it] of keep) placeTile(el, it);
+}
+function placeTile(el, it) {
+  let i = 0;
+  for (let k = 1; k < masonry.heights.length; k++) if (masonry.heights[k] < masonry.heights[i] - 0.01) i = k;
+  masonry.cols[i].append(el);
+  masonry.heights[i] += (it.w && it.h ? Math.min(2.2, it.h / it.w) : 1) + 0.18;
+  masonry.tiles.push([el, it]);
+}
+new ResizeObserver(() => {
+  if ($('picker').hidden || !masonry.cols.length) return;
+  const n = columnCount();
+  if (n !== masonry.cols.length) resetColumns(n, [...masonry.tiles]);
+}).observe($('results'));
+
+function statusLine(msg) {
+  $('resultsStatus').textContent = msg || (found.picked
+    ? `${found.picked}개 꽂았어요. 더 골라도 되고, 다 골랐으면 닫기`
+    : '누르면 바로 케이크에 꽂혀요. 여러 개 골라도 돼요');
 }
 
 function resultTile(it) {
@@ -829,28 +887,55 @@ function resultTile(it) {
   b.className = 'tile';
   b.title = it.title || '';
   b.setAttribute('aria-label', `${it.title || '이미지'} 꽂기`);
+  // 자리를 미리 잡아 두어 이미지가 늦게 떠도 칸이 겹치거나 튀지 않게 한다
+  if (it.w && it.h) b.style.setProperty('--ar', `${it.w} / ${it.h}`);
+  // 선명한 미리보기가 오기 전까지 빨리 뜨는 작은 썸네일을 흐릿하게 깔아 둔다
+  if (it.thumb) b.style.setProperty('--thumb', `url("${it.thumb.replace(/["\\]/g, '')}")`);
   const img = document.createElement('img');
   img.loading = 'lazy';
   img.decoding = 'async';
   img.referrerPolicy = 'no-referrer';
   img.alt = '';
-  img.src = it.thumb;
-  img.onerror = () => { img.onerror = null; img.src = viaWorker(it.thumb); };
-  b.append(img);
+  // 미리보기는 원본을 줄인 것(전체가 보이게) → 막히면 중계 서버 썸네일 → 그대로 썸네일
+  const tries = [preview(it.link), viaWorker(it.thumb), it.thumb];
+  img.onload = () => b.classList.add('ready');
+  img.onerror = () => { const next = tries.shift(); if (next) img.src = next; else b.hidden = true; };
+  img.src = tries.shift();
+  const cap = document.createElement('span');
+  cap.className = 'cap';
+  cap.textContent = it.title || '';
+  b.append(img, cap);
   b.addEventListener('click', async () => {
     if (b.classList.contains('busy')) return;
     b.classList.add('busy');
-    // 원본이 크고 선명하지만 막혀 있는 경우가 많아서, 실패하면 네이버 썸네일로 꽂는다
+    // 화면에 이미 받아 둔 미리보기(600px)로 바로 꽂고, 그게 안 되면 원본 → 썸네일 순으로
     await ingest(async () => {
-      try { return await normalize(await loadImg(viaWorker(it.link), true)); }
-      catch { return normalize(await loadImg(viaWorker(it.thumb), true)); }
+      const shown = img.currentSrc || img.src;
+      for (const u of [shown, viaWorker(it.link), viaWorker(it.thumb)]) {
+        try { return await normalize(await loadImg(u, true)); } catch { /* 다음 */ }
+      }
+      throw new Error('no image');
     });
     b.classList.remove('busy');
-    b.classList.add('used');
+    if (!b.classList.contains('used')) { b.classList.add('used'); found.picked++; statusLine(); }
   });
   return b;
 }
 $('more').addEventListener('click', () => searchIn(found.q, true));
+$('pickerClose').addEventListener('click', closePicker);
+$('picker').addEventListener('click', (e) => { if (e.target === $('picker')) closePicker(); });
+$('reopen').addEventListener('click', () => { openPicker(); statusLine(); });
+$('pickerForm').addEventListener('submit', (e) => {
+  e.preventDefault();
+  const q = $('pq').value.trim();
+  if (q) { $('pq').blur(); searchIn(q); }
+});
+window.addEventListener('keydown', (e) => { if (e.key === 'Escape' && !$('picker').hidden) closePicker(); });
+// 끝까지 내리면 자동으로 더 불러오기
+const moreWatch = new IntersectionObserver((entries) => {
+  if (entries.some((en) => en.isIntersecting) && found.next && !found.busy && !$('picker').hidden && masonry.tiles.length) searchIn(found.q, true);
+}, { root: $('pickerBody'), rootMargin: '600px' });
+moreWatch.observe($('sentinel'));
 // 구글은 COOP 헤더 때문에 한 번 연 창을 이름으로 다시 찾을 수 없다(검색할 때마다 새 창이 생김).
 // 그래서 구글 창을 이미 열었으면 새로 열지 않고 검색어만 복사해 그 창에서 붙여넣게 한다.
 let googleOpened = false;
@@ -1258,7 +1343,11 @@ async function runSmoke() {
     tiles[0]?.click();
     await sleep(300);
     tiles[1]?.click();
-    await sleep(4000);
+    for (let i = 0; i < 30 && document.querySelectorAll('.tile.used').length < 2; i++) await sleep(500);
+    console.log('SMOKE search picked after', document.querySelectorAll('.tile.used').length, 'busy', document.querySelectorAll('.tile.busy').length);
+    $('pickerBody').scrollTop = 99999;
+    await sleep(2500);
+    console.log('SMOKE search cols', masonry.cols.length, 'after-scroll tiles', document.querySelectorAll('.tile').length, 'ready', document.querySelectorAll('.tile.ready').length);
     console.log('SMOKE search engine', state.engine, 'tiles', tiles.length, 'status', $('resultsStatus').textContent, 'stickers', state.stickers.length, 'used', document.querySelectorAll('.tile.used').length);
     return;
   }

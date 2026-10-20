@@ -525,57 +525,140 @@ button, .btn, .seg button, summary, .filepick { touch-action: manipulation; -web
   .fields { grid-template-columns: 1fr; }
 }
 
-/* ---------- 바로 검색 결과 ---------- */
+/* ---------- 바로 검색: 골라서 꽂기 창 ---------- */
 .add.inmode .ext { display: none !important; }
-.results-wrap { display: flex; flex-direction: column; gap: 8px; }
-.results-status { margin: 0; font-size: 13.5px; color: var(--muted); }
-.results {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  grid-auto-rows: max-content;
-  align-items: start;
-  gap: 8px;
-  max-height: 420px;
-  overflow-y: auto;
-  padding: 4px 6px 8px 2px;
-  overscroll-behavior: contain;
+.reopen { align-self: flex-start; }
+body.picker-open { overflow: hidden; }
+.picker {
+  position: fixed;
+  inset: 0;
+  z-index: 15;
+  display: flex;
+  justify-content: flex-end;
+  background: rgba(43, 21, 32, 0.18);
 }
-.results:empty { display: none; }
+.picker-card {
+  width: min(880px, 60vw);
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  background: var(--cream);
+  border-left: 3px solid var(--ink);
+  box-shadow: -8px 0 0 var(--ink);
+  padding-block: calc(18px + env(safe-area-inset-top, 0px)) 0;
+  padding-left: 20px;
+  padding-right: max(20px, env(safe-area-inset-right, 0px));
+}
+.picker-head { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+.picker-head h2.tag {
+  position: static;
+  margin: 0;
+  font: 400 18px/1 var(--display);
+  padding: 7px 14px 6px;
+  border: var(--bw) solid var(--ink);
+  border-radius: 999px;
+  box-shadow: 2px 2px 0 var(--ink);
+  background: var(--pink);
+  transform: rotate(-2deg);
+}
+.picker-search { flex: 1; min-width: 200px; }
+.results-status { margin: 0; font-size: 14px; color: var(--muted); }
+.picker-body {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: 4px 6px calc(24px + env(safe-area-inset-bottom, 0px)) 2px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+/* 원래 비율 그대로 벽돌 쌓기 (줄 나누기는 app.js의 placeTile) */
+.results { display: flex; align-items: flex-start; gap: 12px; }
+.results .col { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 12px; }
 .tile {
   position: relative;
   display: block;
   width: 100%;
+  margin: 0;
   padding: 0;
   border: 2px solid var(--ink);
   border-radius: 12px;
-  background: var(--cream);
+  background: var(--paper);
   overflow: hidden;
   cursor: pointer;
-  box-shadow: 2px 2px 0 var(--ink);
+  box-shadow: 3px 3px 0 var(--ink);
   transition: transform 0.08s, box-shadow 0.08s;
   touch-action: manipulation;
+  text-align: left;
 }
-/* 정사각형 칸: aspect-ratio는 스크롤 그리드에서 높이가 무너지는 브라우저가 있어 높이를 직접 확보한다 */
-.tile::before { content: ""; display: block; padding-top: 100%; }
-.tile img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; display: block; }
-.tile:active { transform: translate(2px, 2px); box-shadow: 0 0 0 var(--ink); }
+.tile::before {
+  content: "";
+  position: absolute;
+  inset: 0 0 auto;
+  aspect-ratio: var(--ar, 1);
+  background: var(--thumb, none) center / cover no-repeat, repeating-linear-gradient(45deg, #FBEFF1 0 10px, #FFF8F9 10px 20px);
+  filter: blur(6px) saturate(1.1);
+  transform: scale(1.06);
+}
+.tile.ready::before { display: none; }
+.tile img {
+  position: relative;
+  display: block;
+  width: 100%;
+  height: auto;
+  aspect-ratio: var(--ar, 1);
+  object-fit: contain;
+  opacity: 0;
+  transition: opacity 0.2s;
+}
+.tile.ready img { aspect-ratio: auto; opacity: 1; background: var(--paper); }
+.tile .cap { position: relative; background: var(--paper); }
+.tile .cap {
+  display: block;
+  padding: 5px 8px 6px;
+  font-size: 12px;
+  color: var(--muted);
+  border-top: 1.5px solid var(--ink);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.tile .cap:empty { display: none; }
+.tile:active { transform: translate(2px, 2px); box-shadow: 1px 1px 0 var(--ink); }
 @media (hover: hover) {
-  .tile:hover { transform: translate(-1px, -1px) rotate(-1.5deg); box-shadow: 3px 3px 0 var(--ink); }
+  .tile:hover { transform: translate(-1px, -1px) rotate(-1deg); box-shadow: 4px 4px 0 var(--ink); }
 }
 .tile.busy::after, .tile.used::after {
   position: absolute;
-  inset: auto 6px 6px auto;
-  font: 400 12px/1 var(--display);
-  padding: 4px 7px 3px;
+  top: 8px;
+  right: 8px;
+  font: 400 14px/1 var(--display);
+  padding: 6px 10px 5px;
   border-radius: 999px;
-  border: 1.5px solid var(--ink);
+  border: 2px solid var(--ink);
+  box-shadow: 2px 2px 0 var(--ink);
 }
 .tile.busy::after { content: "꽂는 중"; background: var(--butter); }
 .tile.used::after { content: "꽂음"; background: var(--mint); }
 .tile.busy img { opacity: 0.6; }
+.tile.used { outline: 3px solid var(--ok); outline-offset: 2px; }
+.sentinel { height: 1px; }
 .more { align-self: center; }
-@media (min-width: 901px) and (max-width: 1180px) {
-  .results { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+
+@media (max-width: 900px) {
+  .picker { background: var(--cream); }
+  .picker-card {
+    width: 100%;
+    border-left: 0;
+    box-shadow: none;
+    padding-left: max(16px, env(safe-area-inset-left, 0px));
+    padding-right: max(16px, env(safe-area-inset-right, 0px));
+  }
+  .results, .results .col { gap: 10px; }
+  .picker-search { order: 3; flex-basis: 100%; }
+  .picker-close { margin-left: auto; }
 }
 @media (prefers-reduced-motion: reduce) {
   .tile { transition: none; }
