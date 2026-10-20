@@ -16,8 +16,18 @@
 <body>
 <div class="app">
   <header class="brand">
-    <h1>가능충 케이크</h1>
-    <p>각자의 "이건 가능"을 막대에 꽂아 한 케이크에.</p>
+    <svg class="logo" viewBox="0 0 64 64" aria-hidden="true">
+      <rect x="29.5" y="6" width="5" height="26" rx="2" fill="#E8C795" stroke="#2B1520" stroke-width="2.5"/>
+      <rect x="17" y="3" width="30" height="20" rx="4" transform="rotate(-6 32 13)" fill="#FFE08A" stroke="#2B1520" stroke-width="3"/>
+      <path d="M26 13.5l4 4 8-9" transform="rotate(-6 32 13)" fill="none" stroke="#E23E6B" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"/>
+      <path d="M8 38v14c0 4 11 8 24 8s24-4 24-8V38" fill="#FF9DBA" stroke="#2B1520" stroke-width="3"/>
+      <ellipse cx="32" cy="38" rx="24" ry="8" fill="#FFF8EE" stroke="#2B1520" stroke-width="3"/>
+      <path d="M9 41c3 6 6 7 8 3s4 5 7 2 5 4 8 1 5 4 8 0 6 4 8-1 4 1 6-5" fill="none" stroke="#E23E6B" stroke-width="3" stroke-linecap="round"/>
+    </svg>
+    <div class="brand-text">
+      <h1>가능충 케이크</h1>
+      <p>각자의 <b>"이건 가능"</b>을 막대에 꽂아 한 케이크에</p>
+    </div>
   </header>
 
   <main class="stage-col">
@@ -28,7 +38,8 @@
       </div>
       <div class="dropveil" id="dropveil" hidden><span>놓으면 꽂혀요</span></div>
     </div>
-    <div class="sel" id="sel" hidden>
+    <div class="sel card tone-lilac" id="sel" hidden>
+      <h2 class="tag">고른 토퍼</h2>
       <div class="sel-row">
         <label class="mini">크기 <input id="selSize" type="range" min="70" max="320" step="1"></label>
         <label class="mini">막대 <input id="selLen" type="range" min="110" max="400" step="1"></label>
@@ -46,7 +57,7 @@
   </main>
 
   <aside class="panel">
-    <section class="card">
+    <section class="card tone-butter">
       <div class="fields">
         <label class="field">
           <span>내 이름</span>
@@ -59,8 +70,8 @@
       </div>
     </section>
 
-    <section class="card room" id="room">
-      <h2>같이 꽂기</h2>
+    <section class="card tone-mint room" id="room">
+      <h2 class="tag">같이 꽂기</h2>
       <div id="roomSolo" class="room-solo">
         <button type="button" class="btn primary" id="roomCreate">방 만들기</button>
         <div class="join">
@@ -69,10 +80,12 @@
         </div>
       </div>
       <div id="roomLive" class="room-live" hidden>
+        <div class="ticket">
+          <span class="ticket-label"><span class="live-dot" aria-hidden="true"></span>방 코드</span>
+          <span class="code" id="roomCodeText" aria-live="polite"></span>
+        </div>
         <div class="code-row">
-          <span class="live-dot" aria-hidden="true"></span>
-          <span class="code" id="roomCodeText">-----</span>
-          <button type="button" class="btn ghost sm" id="roomCopy">초대 링크 복사</button>
+          <button type="button" class="btn primary sm" id="roomCopy">초대 링크 복사</button>
           <button type="button" class="btn ghost sm" id="roomLeave">나가기</button>
         </div>
         <ul class="peers" id="peers"></ul>
@@ -80,8 +93,17 @@
       <p class="note" id="roomNote">방을 만들고 초대 링크를 보내면, 친구가 꽂는 이미지가 모두의 케이크에 바로 꽂혀요.</p>
     </section>
 
-    <section class="card add">
-      <h2>이미지 찾기</h2>
+    <section class="card tone-sky chat" id="chat" hidden>
+      <h2 class="tag">수다</h2>
+      <ol class="chat-log" id="chatLog" aria-live="polite"></ol>
+      <form class="chat-form" id="chatForm">
+        <input id="chatInput" type="text" maxlength="200" placeholder="이 케이크 실화냐…" aria-label="채팅 메시지" autocomplete="off">
+        <button type="submit" class="btn primary">보내기</button>
+      </form>
+    </section>
+
+    <section class="card tone-pink add">
+      <h2 class="tag">이미지 찾기</h2>
       <form class="search" id="searchForm">
         <input id="q" type="search" placeholder="고든 램지, 그 캐릭터…" autocomplete="off" aria-label="검색어">
         <button type="submit" class="btn primary">검색</button>
@@ -106,7 +128,7 @@
       </label>
       <details class="bm">
         <summary>검색 창에 <b>케이크에 꽂기</b> 버튼 띄우기</summary>
-        <p>아래 버튼을 북마크바로 끌어다 두세요. 검색 창에서 그 북마크를 한 번 누르면, 이미지에 마우스를 올릴 때 <b>케이크에 꽂기</b> 버튼이 떠요. 이 사이트의 검색 버튼으로 연 창에서만 동작해요.</p>
+        <p>아래 버튼을 북마크바로 끌어다 두세요. 검색 창에서 그 북마크를 한 번 누르면, 이미지에 마우스를 올릴 때 <b>케이크에 꽂기</b> 버튼이 떠요.</p>
         <a class="bmlink" id="bmlink" href="#">케이크에 꽂기</a>
       </details>
     </section>
@@ -115,10 +137,10 @@
       <label class="check"><input id="showNames" type="checkbox" checked> 이름표</label>
       <span class="count" id="count">0개</span>
       <span class="act-btns">
-        <button type="button" class="btn ghost" id="clearAll">다 비우기</button>
-        <button type="button" class="btn ghost" id="copy">이미지 복사</button>
+        <button type="button" class="btn ghost sm" id="clearAll">다 비우기</button>
+        <button type="button" class="btn ghost sm" id="copy">이미지 복사</button>
       </span>
-      <button type="button" class="btn primary" id="save">PNG 저장</button>
+      <button type="button" class="btn primary big" id="save">PNG로 저장하기</button>
     </footer>
   </aside>
 </div>

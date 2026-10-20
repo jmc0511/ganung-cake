@@ -27,9 +27,9 @@ function open(query, w, h) {
 }
 
 app.whenReady().then(() => server.listen(0, async () => {
-  const host = open(`smoke=host&code=${code}`, 1400, 900);
+  const host = open(`smoke=host&code=${code}`, 1400, 1500);
   await new Promise((r) => setTimeout(r, 6000));
-  const guest = open(`smoke=guest&code=${code}`, 420, 900);
+  const guest = open(`smoke=guest&code=${code}`, 420, 2400);
   await new Promise((r) => setTimeout(r, 16000));
   fs.writeFileSync(path.join(out, 'web-host.png'), (await host.webContents.capturePage()).toPNG());
   fs.writeFileSync(path.join(out, 'web-guest.png'), (await guest.webContents.capturePage()).toPNG());

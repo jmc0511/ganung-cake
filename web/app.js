@@ -537,6 +537,10 @@ function addSticker(norm, who = state.who) {
     who: (who || '').trim(),
   };
   Net.send({ t: 'add', sticker: s });
+  if (Net.active) {
+    Net.send({ t: 'event', name: Net.name });
+    addChat(null, '내가 토퍼를 꽂았어요');
+  }
   putSticker({ ...s }, true).then(() => select(state.stickers.find((o) => o.id === s.id)));
   return s;
 }
@@ -590,6 +594,8 @@ function applyOp(op) {
     }
     case 'remove': removeSticker(op.id, false); break;
     case 'clear': clearStickers(false); break;
+    case 'chat': addChat(op.sys && Net.role === 'guest' ? null : op.name, op.text); break;
+    case 'event': addChat(null, `${op.name} 님이 토퍼를 꽂았어요`); break;
     case 'title':
       state.title = String(op.title || '').slice(0, 30);
       $('title').value = state.title;
@@ -819,6 +825,42 @@ try {
   };
 } catch { /* BroadcastChannel 미지원 */ }
 
+// ---------- 채팅 ----------
+function addChat(name, text) {
+  text = String(text || '').slice(0, 200);
+  if (!text.trim()) return;
+  const log = $('chatLog');
+  const nearBottom = log.scrollHeight - log.scrollTop - log.clientHeight < 40;
+  const li = document.createElement('li');
+  if (name === null) {
+    li.className = 'sys';
+    li.textContent = text;
+  } else {
+    const mine = name === Net.name;
+    li.className = mine ? 'msg mine' : 'msg';
+    const who = document.createElement('span');
+    who.className = 'who';
+    who.textContent = name;
+    who.style.background = colorFor(name);
+    const body = document.createElement('span');
+    body.className = 'bubble';
+    body.textContent = text;
+    li.append(who, body);
+  }
+  log.append(li);
+  while (log.children.length > 150) log.firstChild.remove();
+  if (nearBottom || name === Net.name) log.scrollTop = log.scrollHeight;
+}
+
+$('chatForm').addEventListener('submit', (e) => {
+  e.preventDefault();
+  const text = $('chatInput').value.trim().slice(0, 200);
+  if (!text || !Net.active) return;
+  $('chatInput').value = '';
+  Net.send({ t: 'chat', name: Net.name, text });
+  addChat(Net.name, text);
+});
+
 // ---------- 방 ----------
 const inviteLink = () => `${location.origin}${location.pathname}?room=${Net.code}`;
 
@@ -837,8 +879,14 @@ function renderPeers(list) {
 function showRoom() {
   const live = Net.active;
   $('roomSolo').hidden = live;
+  $('chat').hidden = !live;
+  if (!live) $('chatLog').replaceChildren();
   $('roomLive').hidden = !live;
-  if (live) $('roomCodeText').textContent = Net.code;
+  if (live) {
+    const el = $('roomCodeText');
+    el.replaceChildren(...[...Net.code].map((ch) => { const t = document.createElement('span'); t.textContent = ch; return t; }));
+    el.setAttribute('aria-label', Net.code);
+  }
   $('roomNote').textContent = !live
     ? '방을 만들고 초대 링크를 보내면, 친구가 꽂는 이미지가 모두의 케이크에 바로 꽂혀요.'
     : Net.role === 'host'
@@ -859,8 +907,8 @@ Net.on = {
   snapshot: () => ({ title: state.title, stickers: state.stickers.map(serial) }),
   receiveSnapshot: loadSnapshot,
   peers: renderPeers,
-  joined: (name) => toast(`${name} 님이 들어왔어요`),
-  left: (name) => toast(`${name} 님이 나갔어요`),
+  joined: (name) => { toast(`${name} 님이 들어왔어요`); addChat(null, `${name} 님이 들어왔어요`); Net.send({ t: 'chat', sys: true, text: `${name} 님이 들어왔어요` }); },
+  left: (name) => { addChat(null, `${name} 님이 나갔어요`); Net.send({ t: 'chat', sys: true, text: `${name} 님이 나갔어요` }); },
   closed: (msg) => { soloBackup = null; showRoom(); save(); toast(msg); },
 };
 
@@ -967,6 +1015,7 @@ async function runSmoke() {
     state.who = '민지';
     await demo([['고든 램지', '#E0B07A', '민지'], ['ChatGPT', '#74AA9C', '민지']]);
     await createRoom('민지', code);
+    setTimeout(() => { $('chatInput').value = '고든 램지 누가 꽂았어 ㅋㅋ'; $('chatForm').requestSubmit(); }, 12000);
   } else if (SMOKE === 'guest') {
     state.who = '도윤';
     await joinRoom('도윤', code);
@@ -975,6 +1024,8 @@ async function runSmoke() {
     await ingest(() => fromUrl('https://upload.wikimedia.org/wikipedia/commons/4/47/PNG_transparency_demonstration_1.png'));
     const first = state.stickers[0];
     if (first) update(first, { size: 230 });
+    $('chatInput').value = '친구네 아빠는 진짜 선 넘었다';
+    $('chatForm').requestSubmit();
   }
   setTimeout(() => console.log('SMOKE', SMOKE, 'role', Net.role, 'stickers', state.stickers.length, state.stickers.map((s) => `${s.who}:${s.shape}:${Math.round(s.size)}`).join(',')), 6000);
 }

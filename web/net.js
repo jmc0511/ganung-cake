@@ -61,6 +61,8 @@
       });
       conn.on('data', (op) => {
         if (!op || typeof op.t !== 'string' || op.t === 'snapshot' || op.t === 'peers') return;
+        // 채팅·알림의 이름은 접속할 때 정한 이름으로 방장이 고정한다
+        if (op.t === 'chat' || op.t === 'event') { op.name = this.conns.get(conn.peer)?.name || '친구'; delete op.sys; }
         this.on.op(op);
         this._broadcast(op, conn.peer);
       });
