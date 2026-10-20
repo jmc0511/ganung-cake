@@ -43,7 +43,22 @@ function loadImg(src, cors = false) {
     i.src = src;
   });
 }
-function roundRect(c, x, y, w, h, r) { c.beginPath(); c.roundRect(x, y, w, h, r); }
+function roundRect(c, x, y, w, h, r) {
+  c.beginPath();
+  if (c.roundRect) return c.roundRect(x, y, w, h, r);
+  // iOS 15 이하 사파리용
+  c.moveTo(x + r, y);
+  c.arcTo(x + w, y, x + w, y + h, r);
+  c.arcTo(x + w, y + h, x, y + h, r);
+  c.arcTo(x, y + h, x, y, r);
+  c.arcTo(x, y, x + w, y, r);
+  c.closePath();
+}
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+const coarse = matchMedia('(pointer: coarse)');
+const syncTouch = () => document.documentElement.classList.toggle('touch', coarse.matches);
+syncTouch();
+coarse.addEventListener?.('change', syncTouch);
 const serial = ({ born, ...s }) => s;
 
 let toastTimer;
@@ -463,7 +478,9 @@ async function normalize(img) {
   const d = o.getImageData(0, 0, c.width, c.height).data; // CORS가 없으면 여기서 실패
   const pts = [[1, 1], [c.width - 2, 1], [1, c.height - 2], [c.width - 2, c.height - 2], [c.width >> 1, 1]];
   const hasAlpha = pts.some(([x, y]) => d[(y * c.width + x) * 4 + 3] < 200);
-  return { src: c.toDataURL('image/webp', 0.9), ar: c.height / c.width, hasAlpha };
+  let src = c.toDataURL('image/webp', 0.9);
+  if (!src.startsWith('data:image/webp') && !hasAlpha) src = c.toDataURL('image/jpeg', 0.9);
+  return { src, ar: c.height / c.width, hasAlpha };
 }
 
 async function fromUrl(url) {
@@ -624,25 +641,45 @@ function toLogical(e) {
   return { x: ((e.clientX - r.left) / r.width) * W, y: ((e.clientY - r.top) / r.height) * H };
 }
 
-function hitTest(p) {
+function hitTest(p, extra = 0) {
   const now = performance.now();
   for (const s of [...state.stickers].sort((a, b) => b.by - a.by)) {
     const { center, w, h, base, top } = geom(s, now);
     const dx = p.x - center.x, dy = p.y - center.y;
     const cos = Math.cos(-s.rot), sin = Math.sin(-s.rot);
     const lx = dx * cos - dy * sin, ly = dx * sin + dy * cos;
-    const pad = BORDER + 4;
+    const pad = BORDER + 4 + extra;
     if (s.shape === 'circle' ? Math.hypot(lx, ly) <= w / 2 + pad : Math.abs(lx) <= w / 2 + pad && Math.abs(ly) <= h / 2 + pad) return s;
     const sx = top.x - base.x, sy = top.y - base.y;
     const t = clamp(((p.x - base.x) * sx + (p.y - base.y) * sy) / (sx * sx + sy * sy), 0, 1);
-    if (Math.hypot(p.x - (base.x + sx * t), p.y - (base.y + sy * t)) < 10) return s;
+    if (Math.hypot(p.x - (base.x + sx * t), p.y - (base.y + sy * t)) < 10 + extra * 1.5) return s;
   }
   return null;
 }
 
+// 터치: 토퍼를 잡았을 때만 끌고(페이지 스크롤 막음), 빈 곳을 쓸면 페이지가 스크롤된다. 두 손가락으로 크기 조절.
+const TOUCH_PAD = 16;
+const pointers = new Map();
+let pinch = null;
+const spread = () => { const [p1, p2] = [...pointers.values()]; return Math.hypot(p1.x - p2.x, p1.y - p2.y); };
+
+canvas.addEventListener('touchstart', (e) => {
+  const grab = e.touches.length > 1 ? !!(drag || pinch) : !!hitTest(toLogical(e.touches[0]), TOUCH_PAD);
+  if (grab) e.preventDefault();
+}, { passive: false });
+canvas.addEventListener('touchmove', (e) => { if (drag || pinch) e.preventDefault(); }, { passive: false });
+
 canvas.addEventListener('pointerdown', (e) => {
   const p = toLogical(e);
-  const s = hitTest(p);
+  pointers.set(e.pointerId, p);
+  if (pointers.size === 2 && drag) {
+    pinch = { s: drag.s, d0: Math.max(10, spread()), size0: drag.s.size };
+    drag = null;
+    canvas.setPointerCapture(e.pointerId);
+    return;
+  }
+  if (pointers.size > 1) return;
+  const s = hitTest(p, e.pointerType === 'touch' ? TOUCH_PAD : 0);
   select(s);
   if (s) {
     drag = { s, dx: s.bx - p.x, dy: s.by - p.y };
@@ -652,16 +689,24 @@ canvas.addEventListener('pointerdown', (e) => {
 });
 canvas.addEventListener('pointermove', (e) => {
   const p = toLogical(e);
-  if (drag) {
+  if (pointers.has(e.pointerId)) pointers.set(e.pointerId, p);
+  if (pinch && pointers.size >= 2) {
+    update(pinch.s, { size: clamp(pinch.size0 * (spread() / pinch.d0), 70, 320) });
+    syncSelPanel();
+  } else if (drag) {
     const q = onTop(p.x + drag.dx, p.y + drag.dy);
     update(drag.s, { bx: q.x, by: q.y });
   } else if (e.pointerType === 'mouse') {
     canvas.style.cursor = hitTest(p) ? 'grab' : 'default';
   }
 });
-const endDrag = () => { if (drag) { drag = null; canvas.style.cursor = 'grab'; } };
-canvas.addEventListener('pointerup', endDrag);
-canvas.addEventListener('pointercancel', endDrag);
+const endPointer = (e) => {
+  pointers.delete(e.pointerId);
+  if (pinch && pointers.size < 2) pinch = null;
+  if (drag && !pointers.size) { drag = null; canvas.style.cursor = 'grab'; }
+};
+canvas.addEventListener('pointerup', endPointer);
+canvas.addEventListener('pointercancel', endPointer);
 canvas.addEventListener('wheel', (e) => {
   const s = hitTest(toLogical(e)) || selected;
   if (!s) return;
@@ -795,19 +840,66 @@ function exportCanvas() {
   render(c.getContext('2d'), { exporting: true });
   return c;
 }
+// 공유·복사는 사용자 동작 직후에 바로 불러야 해서(사파리) blob을 동기로 만든다
+function exportBlob() {
+  const bin = atob(exportCanvas().toDataURL('image/png').split(',')[1]);
+  const bytes = new Uint8Array(bin.length);
+  for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+  return new Blob([bytes], { type: 'image/png' });
+}
+const fileName = () => `${(state.title.trim() || '가능충 케이크').replace(/[\\/:*?"<>|]/g, '')}.png`;
+
 $('save').addEventListener('click', () => {
+  const url = URL.createObjectURL(exportBlob());
   const a = document.createElement('a');
-  a.download = `${(state.title.trim() || '가능충 케이크').replace(/[\\/:*?"<>|]/g, '')}.png`;
-  a.href = exportCanvas().toDataURL('image/png');
+  a.download = fileName();
+  a.href = url;
+  document.body.append(a);
   a.click();
+  a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 10000);
 });
-$('copy').addEventListener('click', async () => {
+$('copy').addEventListener('click', () => {
+  if (!window.ClipboardItem || !navigator.clipboard?.write) return toast('이 브라우저는 이미지 복사를 지원하지 않아요. 저장이나 공유를 써주세요.', true);
+  navigator.clipboard.write([new ClipboardItem({ 'image/png': exportBlob() })])
+    .then(() => toast('복사했어요. 카톡이나 디코에 붙여넣으세요'))
+    .catch(() => toast('이미지 복사가 막혀 있어요. 저장이나 공유를 써주세요.', true));
+});
+(() => {
   try {
-    const blob = await new Promise((res) => exportCanvas().toBlob(res, 'image/png'));
-    await navigator.clipboard.write([new ClipboardItem({ 'image/png': blob })]);
-    toast('복사했어요. 카톡이나 디코에 붙여넣으세요');
+    const probe = new File([new Blob(['x'], { type: 'image/png' })], 'a.png', { type: 'image/png' });
+    $('share').hidden = !(navigator.canShare && navigator.canShare({ files: [probe] }));
+  } catch { $('share').hidden = true; }
+})();
+$('share').addEventListener('click', () => {
+  const file = new File([exportBlob()], fileName(), { type: 'image/png' });
+  navigator.share({ files: [file], title: state.title.trim() || '가능충 케이크' }).catch((e) => {
+    if (e?.name !== 'AbortError') toast('공유하지 못했어요. 저장을 써주세요.', true);
+  });
+});
+$('pasteBtn').addEventListener('click', async () => {
+  if (!navigator.clipboard?.read) {
+    try {
+      const t = (await navigator.clipboard.readText()).trim();
+      if (/^https?:/i.test(t)) return ingest(() => fromUrl(t));
+    } catch { /* 지원 안 함 또는 거부 */ }
+    return toast('이 브라우저는 붙여넣기 버튼을 지원하지 않아요. 이미지를 저장한 뒤 내 기기에서 고르기를 써주세요.', true);
+  }
+  try {
+    const items = await navigator.clipboard.read();
+    for (const item of items) {
+      const type = item.types.find((t) => t.startsWith('image/'));
+      if (type) return ingest(async () => fromBlob(await item.getType(type)));
+    }
+    for (const item of items) {
+      if (item.types.includes('text/plain')) {
+        const t = (await (await item.getType('text/plain')).text()).trim();
+        if (/^(https?:|data:image\/)/i.test(t)) return ingest(() => fromUrl(t));
+      }
+    }
+    toast('복사한 이미지가 없어요. 이미지를 길게 눌러 복사해 주세요.', true);
   } catch {
-    toast('이 브라우저는 이미지 복사를 막고 있어요. PNG 저장을 써주세요.', true);
+    toast('붙여넣기가 허용되지 않았어요. 한 번 더 누르고 허용을 눌러주세요.', true);
   }
 });
 
@@ -931,13 +1023,53 @@ Net.on = {
   peers: renderPeers,
   joined: (name) => { toast(`${name} 님이 들어왔어요`); addChat(null, `${name} 님이 들어왔어요`); Net.send({ t: 'chat', sys: true, text: `${name} 님이 들어왔어요` }); },
   left: (name) => { addChat(null, `${name} 님이 나갔어요`); Net.send({ t: 'chat', sys: true, text: `${name} 님이 나갔어요` }); },
-  closed: (msg) => { soloBackup = null; showRoom(); save(); toast(msg); },
+  closed: (msg) => rejoin(msg),
 };
+
+// 폰에서 다른 탭에 다녀오면 연결이 끊길 수 있어서, 참가자는 몇 번 자동으로 다시 들어간다
+let lastRoom = null;
+let rejoining = false;
+function visibleAgain() {
+  return new Promise((r) => {
+    const f = () => { if (document.visibilityState === 'visible') { document.removeEventListener('visibilitychange', f); r(); } };
+    document.addEventListener('visibilitychange', f);
+  });
+}
+async function rejoin(msg) {
+  if (rejoining || !lastRoom) return;
+  rejoining = true;
+  showRoom();
+  $('roomSolo').hidden = true;
+  $('roomNote').textContent = '연결이 끊겨서 다시 들어가는 중이에요…';
+  for (let i = 0; i < 8 && lastRoom; i++) {
+    await Promise.race([sleep(1500 + i * 1500), visibleAgain()]);
+    if (!lastRoom) break;
+    try {
+      await Net.join(lastRoom.name, lastRoom.code);
+      rejoining = false;
+      showRoom();
+      toast('다시 연결됐어요');
+      return;
+    } catch { /* 다음 시도 */ }
+  }
+  rejoining = false;
+  if (!lastRoom) return;
+  lastRoom = null;
+  soloBackup = null;
+  showRoom();
+  save();
+  toast(msg);
+}
 
 async function createRoom(name, code) {
   $('roomCreate').disabled = true;
   try {
-    await Net.create(name, code);
+    // 같은 코드로 다시 열 때는 이전 연결이 정리될 때까지 몇 번 기다린다
+    for (let tries = code ? 6 : 1; ; ) {
+      try { await Net.create(name, code); break; }
+      catch (e) { if (--tries <= 0) throw e; await sleep(2500); }
+    }
+    try { sessionStorage.setItem('ganung-host', Net.code); } catch { /* 저장 불가 */ }
     showRoom();
     history.replaceState(null, '', `?room=${Net.code}`);
     toast('방을 만들었어요. 초대 링크를 보내세요');
@@ -951,9 +1083,10 @@ async function createRoom(name, code) {
 async function joinRoom(name, code) {
   $('roomJoin').disabled = true;
   toast('방에 들어가는 중…');
-  soloBackup = { title: state.title, stickers: state.stickers.map(serial) };
+  if (!soloBackup) soloBackup = { title: state.title, stickers: state.stickers.map(serial) };
   try {
     await Net.join(name, code);
+    lastRoom = { name, code: Net.code };
     showRoom();
     history.replaceState(null, '', `?room=${Net.code}`);
     toast('들어왔어요. 같이 꽂아요');
@@ -980,7 +1113,9 @@ $('roomCopy').addEventListener('click', async () => {
   catch { toast(inviteLink()); }
 });
 $('roomLeave').addEventListener('click', async () => {
-  const wasGuest = Net.role === 'guest';
+  const wasGuest = Net.role === 'guest' || rejoining;
+  lastRoom = null;
+  try { sessionStorage.removeItem('ganung-host'); } catch { /* 저장 불가 */ }
   Net.leave();
   history.replaceState(null, '', location.pathname);
   showRoom();
@@ -1049,6 +1184,15 @@ async function runSmoke() {
     $('chatInput').value = '친구네 아빠는 진짜 선 넘었다';
     $('chatForm').requestSubmit();
   }
+  if (SMOKE === 'mobile') {
+    state.who = '서연';
+    await demo([['고든 램지', '#E0B07A', '서연'], ['펭수', '#7FC8E8', '서연'], ['그 악역', '#B07AC9', '서연', 'circle']]);
+    window.__smokeInfo = () => {
+      const s = state.stickers[0], r = canvas.getBoundingClientRect(), g = geom(s, performance.now());
+      return { id: s.id, cx: r.left + (g.center.x / W) * r.width, cy: r.top + (g.center.y / H) * r.height, size: s.size, bx: s.bx, scrollY, canvasTop: r.top };
+    };
+    return;
+  }
   setTimeout(() => console.log('SMOKE', SMOKE, 'role', Net.role, 'stickers', state.stickers.length, state.stickers.map((s) => `${s.who}:${s.shape}:${Math.round(s.size)}`).join(',')), 6000);
 }
 
@@ -1075,5 +1219,10 @@ async function runSmoke() {
 
   if (SMOKE) return runSmoke();
   const room = (params.get('room') || '').trim().toUpperCase();
-  if (/^[A-Z0-9]{5}$/.test(room)) askNameThenJoin(room);
+  if (!/^[A-Z0-9]{5}$/.test(room)) return;
+  // 방장이 새로고침했거나 폰이 탭을 다시 불러온 경우: 같은 코드로 방을 다시 연다
+  let hostCode = null;
+  try { hostCode = sessionStorage.getItem('ganung-host'); } catch { /* 저장 불가 */ }
+  if (hostCode === room && state.who.trim()) createRoom(state.who.trim(), room);
+  else askNameThenJoin(room);
 })();

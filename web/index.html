@@ -34,7 +34,8 @@
     <div class="stage" id="stage">
       <canvas id="cake" aria-label="케이크 미리보기"></canvas>
       <div class="empty" id="empty">
-        <p>이미지를 여기로 <b>끌어다 놓거나</b><br><b>Ctrl+V</b>로 붙여넣으세요</p>
+        <p class="only-mouse">이미지를 여기로 <b>끌어다 놓거나</b><br><b>Ctrl+V</b>로 붙여넣으세요</p>
+        <p class="only-touch">아래 <b>이미지 찾기</b>에서<br>검색해서 꽂아보세요</p>
       </div>
       <div class="dropveil" id="dropveil" hidden><span>놓으면 꽂혀요</span></div>
     </div>
@@ -118,19 +119,27 @@
         <button type="button" data-engine="pinterest">핀터레스트</button>
         <button type="button" data-engine="namu">나무위키</button>
       </div>
-      <ol class="how">
+      <ol class="how only-mouse">
         <li>검색하면 옆에 검색 창이 열려요.</li>
         <li>마음에 드는 이미지를 케이크로 <b>끌어다 놓거나</b>, 우클릭 &gt; <b>이미지 복사</b> 후 여기서 <b>Ctrl+V</b>.</li>
+      </ol>
+      <ol class="how only-touch">
+        <li>검색하면 새 탭으로 열려요.</li>
+        <li>이미지를 <b>길게 눌러 복사</b>하고 이 탭으로 돌아와요.</li>
+        <li>아래 <b>복사한 이미지 붙여넣기</b>를 누르면 꽂혀요.</li>
       </ol>
       <form class="urlform" id="urlForm">
         <input id="url" type="text" placeholder="이미지 주소를 붙여넣어도 돼요" aria-label="이미지 주소" autocomplete="off">
         <button type="submit" class="btn ghost">꽂기</button>
       </form>
+      <div class="pick-row">
+        <button type="button" class="btn ghost" id="pasteBtn">복사한 이미지 붙여넣기</button>
       <label class="filepick">
         <input id="file" type="file" accept="image/*" multiple>
         <span>내 기기에서 고르기</span>
       </label>
-      <details class="bm">
+      </div>
+      <details class="bm only-mouse">
         <summary>검색 창에 <b>케이크에 꽂기</b> 버튼 띄우기</summary>
         <p>아래 버튼을 북마크바로 끌어다 두세요. 검색 창에서 그 북마크를 한 번 누르면, 이미지에 마우스를 올릴 때 <b>케이크에 꽂기</b> 버튼이 떠요.</p>
         <a class="bmlink" id="bmlink" href="#">케이크에 꽂기</a>
@@ -143,6 +152,7 @@
       <span class="act-btns">
         <button type="button" class="btn ghost sm" id="clearAll">다 비우기</button>
         <button type="button" class="btn ghost sm" id="copy">이미지 복사</button>
+        <button type="button" class="btn ghost sm" id="share" hidden>공유</button>
       </span>
       <button type="button" class="btn primary big" id="save">PNG로 저장하기</button>
     </footer>

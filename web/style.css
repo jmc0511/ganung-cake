@@ -78,7 +78,7 @@ body {
 .stage {
   position: relative;
   width: 100%;
-  max-width: calc((100vh - 200px) * 0.9);
+  max-width: calc((100vh - 200px) * 0.9); max-width: calc((100dvh - 200px) * 0.9);
   aspect-ratio: 9 / 10;
   margin-top: 10px;
 }
@@ -90,7 +90,7 @@ body {
   border-radius: 24px;
   box-shadow: 8px 8px 0 var(--ink);
   background: var(--paper);
-  touch-action: none;
+  touch-action: pan-y;
 }
 /* 마스킹테이프 */
 .stage::before, .stage::after {
@@ -252,7 +252,7 @@ button:focus-visible, input:focus-visible, summary:focus-visible, a:focus-visibl
 .seg button.on { background: var(--butter); color: var(--ink); box-shadow: inset 0 0 0 2px var(--ink); }
 
 /* ---------- 고른 토퍼 ---------- */
-.sel { width: 100%; max-width: calc((100vh - 200px) * 0.9); }
+.sel { width: 100%; max-width: calc((100vh - 200px) * 0.9); max-width: calc((100dvh - 200px) * 0.9); }
 .sel-row { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
 .mini { display: flex; align-items: center; gap: 8px; flex: 1; min-width: 150px; font: 400 14px var(--display); }
 .selwho { flex: 1; min-width: 90px; }
@@ -485,4 +485,42 @@ input[type="range"] { flex: 1; min-width: 0; accent-color: var(--berry); }
 @media (prefers-reduced-motion: reduce) {
   .toast, .btn, input { transition: none; }
   .live-dot { animation: none; }
+}
+
+/* ---------- 터치 기기 (폰·패드) ---------- */
+html.touch .only-mouse { display: none !important; }
+html:not(.touch) .only-touch { display: none !important; }
+.app { min-height: 100dvh; }
+.stage canvas { -webkit-touch-callout: none; -webkit-user-select: none; user-select: none; }
+button, .btn, .seg button, summary, .filepick { touch-action: manipulation; -webkit-tap-highlight-color: transparent; }
+.pick-row { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+
+/* 마우스가 없는 기기에서는 눌렀다 뗀 뒤 떠 있는 효과가 남지 않게 */
+@media (hover: none) {
+  .btn:hover { transform: none; box-shadow: 3px 3px 0 var(--ink); }
+  .btn.sm:hover { box-shadow: 2px 2px 0 var(--ink); }
+  .btn.big:hover { box-shadow: var(--pop); }
+  .btn.primary:hover { background: var(--berry); }
+  .btn.ghost:hover { background: var(--paper); }
+  .btn:active { transform: translate(2px, 2px); box-shadow: 1px 1px 0 var(--ink); }
+}
+
+@media (max-width: 900px) {
+  /* iOS는 16px보다 작은 입력칸에 초점이 가면 화면을 확대한다 */
+  input[type="text"], input[type="search"] { font-size: 16px; }
+  .panel { padding-top: 6px; }
+  /* 고른 토퍼 조절판은 화면 아래에 붙어 따라온다 */
+  .sel {
+    position: sticky;
+    bottom: calc(10px + env(safe-area-inset-bottom, 0px));
+    z-index: 5;
+    box-shadow: 4px 4px 0 var(--ink), 0 10px 30px -10px rgba(43, 21, 32, 0.35);
+  }
+  .chat-log { height: 200px; }
+}
+
+/* 패드 가로(1024~1366)처럼 높이가 넉넉하지 않은 2단 화면 */
+@media (min-width: 901px) and (max-width: 1180px) {
+  .app { grid-template-columns: minmax(0, 1fr) 340px; gap: 16px 20px; }
+  .fields { grid-template-columns: 1fr; }
 }
