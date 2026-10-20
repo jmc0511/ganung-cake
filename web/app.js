@@ -546,7 +546,8 @@ async function putSticker(s, animate) {
 }
 
 // ---------- 공개 연출: 꽂기 전에 모두에게 크게 보여주기 ----------
-const REVEAL_MS = SMOKE && SMOKE !== 'reveal' ? 300 : 3200;
+// 3초 동안은 넘길 수 없이 모두에게 보여주고, 끝나면 자동으로 꽂는다
+const REVEAL_MS = SMOKE && SMOKE !== 'reveal' ? 300 : 3000;
 const revealQueue = [];
 let revealing = null;
 function revealSticker(s) {
@@ -572,7 +573,7 @@ function nextReveal() {
   $('revealWho').textContent = who ? `${who}의 가능!` : '새 토퍼 등장!';
   $('revealWho').style.background = who ? colorFor(who) : 'var(--berry)';
   $('revealKicker').textContent = ['두구두구…', '이건 좀…', '과연…', '실화냐…'][Math.floor(Math.random() * 4)];
-  $('revealHint').textContent = '누르면 바로 꽂혀요';
+  countdown(item);
   showQueueCount();
   const card = $('revealCard');
   card.classList.remove('pop');
@@ -588,10 +589,21 @@ function nextReveal() {
   clearTimeout(item.timer);
   item.timer = setTimeout(finishReveal, REVEAL_MS);
 }
+function countdown(item) {
+  const end = performance.now() + REVEAL_MS;
+  const tick = () => {
+    if (revealing !== item) return;
+    const left = Math.max(1, Math.ceil((end - performance.now()) / 1000));
+    $('revealHint').textContent = `${left}초 뒤 케이크에 꽂혀요`;
+    if (performance.now() < end) item.tickTimer = setTimeout(tick, 200);
+  };
+  tick();
+}
 function finishReveal() {
   const item = revealing;
   if (!item) return;
   clearTimeout(item.timer);
+  clearTimeout(item.tickTimer);
   const { s } = item;
   // '자세히 보기'로 연 이미 꽂힌 토퍼는 다시 떨어뜨리지 않는다
   if (s.pending) { s.pending = false; s.born = performance.now(); }
@@ -599,9 +611,10 @@ function finishReveal() {
   item.done();
   nextReveal();
 }
-$('reveal').addEventListener('click', finishReveal);
+// 공개 연출은 넘길 수 없고, '자세히 보기'로 연 화면만 눌러서 닫는다
+$('reveal').addEventListener('click', () => { if (revealing?.viewOnly) finishReveal(); });
 window.addEventListener('keydown', (e) => {
-  if (revealing && (e.key === 'Escape' || e.key === 'Enter' || e.key === ' ')) { e.preventDefault(); finishReveal(); }
+  if (revealing?.viewOnly && (e.key === 'Escape' || e.key === 'Enter' || e.key === ' ')) { e.preventDefault(); finishReveal(); }
 });
 
 // ---------- 토퍼 전체 보기 ----------
@@ -637,7 +650,7 @@ function closeGallery() { $('gallery').hidden = true; }
 // 이미 꽂힌 토퍼를 크게 다시 보기 (연출과 같은 화면, 케이크에는 영향 없음)
 function showOnly(s) {
   if (revealing) return;
-  revealing = { s, done() {}, timer: 0 };
+  revealing = { s, done() {}, timer: 0, viewOnly: true };
   $('revealImg').src = s.src;
   $('revealWho').textContent = s.who ? `${s.who}의 가능` : '토퍼';
   $('revealWho').style.background = s.who ? colorFor(s.who) : 'var(--muted)';

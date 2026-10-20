@@ -24,7 +24,10 @@ app.whenReady().then(() => server.listen(0, async () => {
   const win = new BrowserWindow({ width: narrow ? 420 : 1400, height: narrow ? 860 : 950, show: false });
   win.webContents.on('console-message', (e) => { if (/rror/.test(e.message)) console.log(e.message); });
   await win.loadURL(`http://localhost:${server.address().port}/?smoke=reveal`);
-  await sleep(2600);
+  await sleep(1200);
+  await win.webContents.executeJavaScript(`document.getElementById('reveal').click()`);
+  console.log('clicked at ~1s, still open:', await win.webContents.executeJavaScript(`!document.getElementById('reveal').hidden && state.stickers.filter(s => s.pending).length === 3`), 'hint:', await win.webContents.executeJavaScript(`document.getElementById('revealHint').textContent`));
+  await sleep(1400);
   const tag = narrow ? '-m' : '';
   fs.writeFileSync(path.join(out, `reveal${tag}.png`), (await win.webContents.capturePage()).toPNG());
   const st = () => win.webContents.executeJavaScript(`({ pending: state.stickers.filter(s => s.pending).length, total: state.stickers.length, open: !document.getElementById('reveal').hidden, queue: document.getElementById('revealQueue').textContent })`);

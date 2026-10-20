@@ -677,7 +677,6 @@ body.picker-open { overflow: hidden; }
   background: rgba(43, 21, 32, 0.62);
   backdrop-filter: blur(3px);
   -webkit-backdrop-filter: blur(3px);
-  cursor: pointer;
   padding-block: calc(16px + env(safe-area-inset-top, 0px)) calc(16px + env(safe-area-inset-bottom, 0px));
   padding-left: max(16px, env(safe-area-inset-left, 0px));
   padding-right: max(16px, env(safe-area-inset-right, 0px));
