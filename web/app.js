@@ -1294,7 +1294,7 @@ function showRoom() {
   $('roomNote').textContent = !live
     ? '방을 만들고 초대 링크를 보내면, 친구가 꽂는 이미지가 모두의 케이크에 바로 꽂혀요.'
     : Net.role === 'host'
-      ? '초대 링크를 단톡에 보내세요. 방장이 이 탭을 닫으면 방이 끝나요.'
+      ? '초대 링크를 단톡에 보내고 이 화면으로 돌아와 주세요. 방장 화면이 꺼져 있으면 친구가 못 들어와요.'
       : '여기서 꽂는 이미지는 모두의 케이크에 꽂혀요. 내 원래 케이크는 나가면 돌아와요.';
 }
 
@@ -1315,6 +1315,17 @@ Net.on = {
   left: (name) => { addChat(null, `${name} 님이 나갔어요`); Net.send({ t: 'chat', sys: true, text: `${name} 님이 나갔어요` }); },
   closed: (msg) => rejoin(msg),
 };
+
+// 방장: 화면으로 돌아오면 바로 연결을 확인하고, 켜 둔 동안은 주기적으로 확인한다. 화면도 안 꺼지게 한다
+let wakeLock = null;
+async function keepAwake() {
+  if (Net.role !== 'host' || document.visibilityState !== 'visible' || wakeLock) return;
+  try { wakeLock = await navigator.wakeLock.request('screen'); wakeLock.addEventListener('release', () => { wakeLock = null; }); }
+  catch { /* 지원 안 함 */ }
+}
+document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') { Net.heal(); keepAwake(); } });
+window.addEventListener('online', () => Net.heal());
+setInterval(() => Net.heal(), 10000);
 
 // 폰에서 다른 탭에 다녀오면 연결이 끊길 수 있어서, 참가자는 몇 번 자동으로 다시 들어간다
 let lastRoom = null;
@@ -1361,6 +1372,7 @@ async function createRoom(name, code) {
     }
     try { sessionStorage.setItem('ganung-host', Net.code); } catch { /* 저장 불가 */ }
     showRoom();
+    keepAwake();
     history.replaceState(null, '', `?room=${Net.code}`);
     toast('방을 만들었어요. 초대 링크를 보내세요');
   } catch {
@@ -1375,7 +1387,15 @@ async function joinRoom(name, code) {
   toast('방에 들어가는 중…');
   if (!soloBackup) soloBackup = { title: state.title, stickers: state.stickers.map(serial) };
   try {
-    await Net.join(name, code);
+    // 방장 폰이 잠깐 다른 앱에 가 있으면 방 코드가 몇 초 사라질 수 있어서, 못 찾으면 조금 기다렸다 다시 찾는다
+    for (let i = 0; ; i++) {
+      try { await Net.join(name, code); break; }
+      catch (e) {
+        if (e.type !== 'peer-unavailable' || i >= 5) throw e;
+        toast(`방장을 찾는 중이에요… (${i + 1}/5)`);
+        await sleep(3000);
+      }
+    }
     lastRoom = { name, code: Net.code };
     showRoom();
     history.replaceState(null, '', `?room=${Net.code}`);
@@ -1473,6 +1493,15 @@ async function runSmoke() {
     if (first) update(first, { size: 230 });
     $('chatInput').value = '친구네 아빠는 진짜 선 넘었다';
     $('chatForm').requestSubmit();
+  }
+  if (SMOKE === 'heal') {
+    // 방장 연결이 끊기거나 망가진 상황을 흉내 낸 뒤 다시 살아나는지 본다
+    state.who = '민지';
+    await createRoom('민지', code);
+    if (params.get('kill') === 'destroy') Net.peer.destroy(); else Net.peer.disconnect();
+    console.log('SMOKE heal killed', params.get('kill'));
+    setTimeout(() => console.log('SMOKE heal host alive', !!Net.peer && !Net.peer.destroyed && !Net.peer.disconnected, 'friends', Net.conns.size), 25000);
+    return;
   }
   if (SMOKE === 'reveal') {
     await demo([['고든 램지', '#E0B07A', '민지'], ['펭수', '#7FC8E8', '도윤'], ['그 악역', '#B07AC9', '서연']]);

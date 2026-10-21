@@ -24,7 +24,7 @@
         p.once('open', () => {
           p.off('error', fail);
           this.peer = p;
-          p.on('disconnected', () => { if (!p.destroyed) p.reconnect(); });
+          p.on('disconnected', () => setTimeout(() => this.heal(), 500));
           resolve(p);
         });
       });
@@ -39,8 +39,7 @@
           await this._open(PREFIX + c);
           this.code = c;
           this.role = 'host';
-          this.peer.on('connection', (conn) => this._accept(conn));
-          this.peer.on('error', () => {});
+          this._hostEvents(this.peer);
           this._peers();
           return c;
         } catch (e) {
@@ -49,6 +48,30 @@
         }
       }
       throw lastErr;
+    },
+
+    _hostEvents(p) {
+      p.on('connection', (conn) => this._accept(conn));
+      p.on('error', () => setTimeout(() => this.heal(), 1500));
+    },
+
+    // 폰에서 카톡 등으로 넘어가면 중계 서버 연결이 끊겨 방 코드가 사라진다.
+    // 끊긴 걸 보면 다시 붙고, 아예 망가졌으면 같은 코드로 방을 다시 연다 (이미 연결된 친구는 그대로)
+    heal() {
+      const p = this.peer;
+      if (!this.role || !p) return;
+      if (!p.destroyed && p.disconnected) { try { p.reconnect(); } catch { /* 다음에 다시 */ } }
+      else if (p.destroyed && this.role === 'host') this._rehost();
+    },
+
+    async _rehost() {
+      if (this._rehosting) return;
+      this._rehosting = true;
+      for (let i = 0; i < 20 && this.role === 'host' && (!this.peer || this.peer.destroyed); i++) {
+        try { this._hostEvents(await this._open(PREFIX + this.code)); break; }
+        catch { await new Promise((r) => setTimeout(r, 3000)); }
+      }
+      this._rehosting = false;
     },
 
     _accept(conn) {
@@ -81,15 +104,15 @@
       this.name = name;
       code = code.trim().toUpperCase();
       return new Promise(async (resolve, reject) => {
-        try { await this._open(); } catch (e) { return reject(e); }
+        try { await this._open(); } catch (e) { return reject(Object.assign(new Error('중계 서버에 연결하지 못했어요. 잠시 뒤 다시 해보세요.'), { type: e.type })); }
         const p = this.peer;
         let settled = false;
-        const fail = (msg) => {
+        const fail = (msg, type) => {
           if (settled) return;
           settled = true;
           p.destroy();
           this.peer = null;
-          reject(new Error(msg));
+          reject(Object.assign(new Error(msg), { type }));
         };
         const timer = setTimeout(() => fail('방에 연결하지 못했어요. 코드를 확인하거나 잠시 뒤 다시 해보세요.'), 15000);
         p.on('error', (e) => {
